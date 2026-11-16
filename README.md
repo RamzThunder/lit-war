@@ -3,7 +3,9 @@
 Phaser 3 + JavaScript + Vite로 만든 탑다운 픽셀 게임입니다.
 싱글플레이와 **최대 30명 교실 멀티플레이**를 지원합니다. 실시간 연결은
 Cloudflare Workers + SQLite 기반 Durable Objects + WebSocket을 사용합니다.
-Firebase는 새 게임에서 사용하지 않습니다. 현재 인터넷 배포는 하지 않았습니다.
+Firebase는 새 게임에서 사용하지 않습니다.
+
+**배포 주소:** https://lit-war-multiplayer.gugeo.workers.dev (2026-11-16 배포, `npm run deploy`)
 
 ## 바로 실행
 
@@ -115,9 +117,9 @@ Durable Object 하나가 방 하나를 담당합니다. 팀 점수, 학생별 �
 - 프로덕션 빌드, Worker dry-run, 헤드리스 브라우저에서 첫 화면 렌더링·콘솔 에러 없음 확인.
 - 두 브라우저 창으로 공격·사보타주·수리 화면을 실제로 조작해 보는 확인은 아직 하지 않았습니다.
 
-## 인터넷 배포 (아직 실행하지 않음)
+## 인터넷 배포
 
-배포 단계에서 Cloudflare 계정에 로그인하고 아래를 실행합니다.
+Cloudflare에 로그인한 상태에서 아래를 실행하면 같은 주소로 갱신됩니다.
 
 ```sh
 npx wrangler login
