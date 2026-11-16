@@ -1,0 +1,24 @@
+{
+  "name": "lit-war-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "dev:server": "wrangler dev --local",
+    "dev:multi": "node scripts/dev-multi.js",
+    "check:worker": "wrangler deploy --dry-run --outdir build-worker",
+    "deploy": "npm run build && wrangler deploy",
+    "test:multiplayer": "node scripts/test-multiplayer.js"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "vite": "^7.2.2",
+    "wrangler": "^4.163.0"
+  }
+}
