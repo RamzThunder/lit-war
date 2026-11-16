@@ -4,7 +4,7 @@ import { createTextures } from '../assets/createTextures.js';
 const SHOCK_RANGE = 40;
 const TEAM_TINT = { blue: 0x8fc3ff, red: 0xff9a8f };
 export class DataCenter extends Phaser.Scene {
-  constructor(state, updateContext) { super('DataCenter'); this.state = state; this.updateContext = updateContext; this.direction = 'down'; }
+  constructor(state, updateContext, touch) { super('DataCenter'); this.state = state; this.updateContext = updateContext; this.touch = touch; this.direction = 'down'; }
   create() {
     createTextures(this);
     this.add.tileSprite(0, 0, map.width, map.height, 'floor').setOrigin(0);
@@ -68,6 +68,7 @@ export class DataCenter extends Phaser.Scene {
     this.lastSentAt = 0; this.lastSent = '';
     this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,ESC,SPACE');
     this.input.keyboard.on('keydown-E', event => { if (!event.repeat) this.interact(); });
+    if (this.touch) this.touch.onAction = () => { if (this.state.raid?.role === 'attacker') this.state.shock(); else this.interact(); };
     this.input.keyboard.on('keydown-SPACE', event => { if (!event.repeat && this.state.raid?.role === 'attacker') this.state.shock(); });
     this.resetInput = () => { this.input.keyboard.resetKeys(); this.player.setVelocity(0); };
     this.game.events.on('blur', this.resetInput);
@@ -175,9 +176,12 @@ export class DataCenter extends Phaser.Scene {
       this.lastSent = '';
     }
     this.renderSabotages();
-    const v = blocked ? { x: 0, y: 0 } : movementVector(k.A.isDown || k.LEFT.isDown, k.D.isDown || k.RIGHT.isDown, k.W.isDown || k.UP.isDown, k.S.isDown || k.DOWN.isDown);
+    let v = blocked ? { x: 0, y: 0 } : movementVector(k.A.isDown || k.LEFT.isDown, k.D.isDown || k.RIGHT.isDown, k.W.isDown || k.UP.isDown, k.S.isDown || k.DOWN.isDown);
+    // Joystick: any direction at full walking speed (same speed the server allows for keys).
+    const stick = this.touch && !blocked && !v.x && !v.y && Math.hypot(this.touch.x, this.touch.y) > 0;
+    if (stick) { const length = Math.hypot(this.touch.x, this.touch.y); v = { x: this.touch.x / length * 130, y: this.touch.y / length * 130 }; }
     this.player.setVelocity(v.x, v.y);
-    if (v.x || v.y) this.direction = v.x ? (v.x < 0 ? 'left' : 'right') : (v.y < 0 ? 'up' : 'down');
+    if (v.x || v.y) this.direction = Math.abs(v.x) >= Math.abs(v.y) ? (v.x < 0 ? 'left' : 'right') : (v.y < 0 ? 'up' : 'down');
     this.player.anims.play(`${v.x || v.y ? 'walk' : 'idle'}-${this.direction}`, true);
     const team = this.state.me?.team;
     this.nameLabel.setPosition(this.player.x, this.player.y - 25).setText(this.state.online ? `${this.state.name} (나)` : '나');
@@ -207,6 +211,7 @@ export class DataCenter extends Phaser.Scene {
     }
     const target = this.target();
     const inRange = raid?.role === 'attacker' && peer?.x != null && Math.hypot(this.player.x - peer.x, this.player.y - peer.y) <= SHOCK_RANGE;
-    this.updateContext({ open, target, raid, inRange, stunned });
+    const context = { open, target, raid, inRange, stunned };
+    this.updateContext(context); this.touch?.update(context);
   }
 }
