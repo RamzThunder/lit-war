@@ -29,22 +29,24 @@ export function bindSabotage(state) {
   for (const t of map.terminals) {
     const tag = document.createElement('span');
     tag.className = 'map-era'; tag.textContent = eraLabel(t.era);
-    Object.assign(tag.style, { left: pct(t.x, map.width), top: pct(t.y < 300 ? t.y + 46 : t.y - 62, map.height) });
+    Object.assign(tag.style, { left: pct(t.x, map.width), top: pct(t.y + 46, map.height) });
     board.append(tag);
   }
   const render = target => {
     $('#sabotage-title').textContent = `${target.team === 'red' ? '홍팀' : '청팀'} · ${target.name}의 방`;
-    const full = target.sabotages.length >= target.max;
+    $('#sabotage-description').textContent = target.kind === 'barricade' ? '상대 방의 통로를 골라 바리케이드를 설치하세요. 120초 뒤 자동 해제되며, 상대가 수리할 수도 있습니다.' : '상대 방의 단말기 한 곳을 골라 고장 내세요. 상대가 수리할 때까지 사용할 수 없습니다.';
+    const full = target.sabotages.filter(s => s.kind === target.kind).length >= target.max;
     for (const button of spots) {
       const taken = target.sabotages.some(s => s.kind === button.dataset.kind && s.era === button.dataset.era);
-      button.disabled = taken || full;
+      button.hidden = button.dataset.kind !== target.kind;
+      button.disabled = taken || full || button.hidden;
       button.classList.toggle('taken', taken);
       const what = button.dataset.kind === 'barricade' ? '통로 바리케이드' : '단말기 고장';
       button.textContent = button.dataset.kind === 'barricade' ? '🚧' : '💥';
       button.setAttribute('aria-label', `${eraLabel(button.dataset.era)} ${what}${taken ? ' (이미 걸림)' : ''}`);
       button.title = button.getAttribute('aria-label');
     }
-    $('#sabotage-feedback').textContent = `이미 걸린 방해 공작 ${target.sabotages.length} / ${target.max}`;
+    $('#sabotage-feedback').textContent = `${target.kind === 'barricade' ? '바리케이드' : '단말기 고장'} ${target.sabotages.filter(s => s.kind === target.kind).length} / ${target.max}`;
   };
   state.events.addEventListener('sabotage-target', ({ detail }) => { render(detail); if (!dialog.open) dialog.showModal(); });
   state.events.addEventListener('sabotage-done', () => { if (dialog.open) dialog.close(); });

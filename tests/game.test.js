@@ -4,6 +4,8 @@ import { GameState } from '../src/prototype/state/GameState.js';
 import { map, ERAS, movementVector, nearestTerminal, terminalFor, doorFor, validPosition, isNearDoor } from '../src/prototype/map.js';
 import { wiringRecords, allRecords } from '../src/prototype/minigames/wiring.js';
 import { frequencyRecords } from '../src/prototype/minigames/frequency.js';
+import { createMissionRound, MISSION_POOL } from '../src/prototype/minigames/missionTypes.js';
+import { createExtraRound, extraTarget, COOKING } from '../src/prototype/minigames/extraMissions.js';
 import { createRepairRound, repairAnswer } from '../src/prototype/minigames/repair.js';
 const ids = era => wiringRecords[era].map(r => r.id);
 const solve = (state, era) => ids(era).forEach(id => state.connect(id, id));
@@ -22,8 +24,49 @@ test('every era has three wiring pairs and three frequency keywords; ids are uni
   for (const era of ERAS) { assert.equal(wiringRecords[era].length, 3); assert.equal(frequencyRecords[era].length, 3); }
   assert.equal(new Set(allRecords.map(r => r.id)).size, allRecords.length);
 });
+test('random era missions include the five new types and reward once', () => {
+  assert.ok(['memory', 'shooter', 'identity', 'filter', 'chronology'].every(type => MISSION_POOL.includes(type)));
+  for (const era of ERAS) for (const type of ['memory', 'shooter', 'identity', 'filter', 'chronology']) {
+    const round = createMissionRound(era, type, () => .4, 1000);
+    const state = new GameState({ terminalOpen: true, terminal: era, round });
+    if (type === 'memory') {
+      assert.equal(state.recall(round.order[0], 1001), 'ignored');
+      round.order.forEach(word => state.recall(word, 3500));
+    } else if (type === 'shooter') {
+      assert.equal(state.shoot(frequencyRecords[era][0].word), 'incorrect');
+      round.wrong.forEach(word => state.shoot(word));
+    } else if (type === 'identity') {
+      assert.equal(state.verifyIdentity(round.order[0], round.order[0], false), 'ignored');
+      round.order.forEach(id => state.verifyIdentity(id, id, true));
+    } else if (type === 'filter') {
+      round.order.forEach(id => state.classify(id, wiringRecords[era].some(r => r.id === id) ? 'current' : 'other'));
+    } else {
+      [...round.order].sort((a, b) => {
+        const left = allRecords.find(r => r.id === a), right = allRecords.find(r => r.id === b);
+        return left.year - right.year || left.title.localeCompare(right.title, 'ko');
+      }).forEach(id => state.shelve(id));
+    }
+    assert.equal(state.snapshot.missions, 1, `${era} ${type}`);
+    assert.equal(state.snapshot.progress[era], 10);
+  }
+});
+test('seven additional mini games use era data and each award only once', () => {
+  for (const era of ERAS) for (const type of ['engine', 'upload', 'truth', 'mail', 'fishing', 'puzzle', ...(era === '1930' ? ['cooking'] : [])]) {
+    const round = createExtraRound(era, type, () => .3);
+    const state = new GameState({ terminalOpen: true, terminal: era, round });
+    const total = type === 'truth' ? round.claims.length : type === 'mail' ? round.order.length : type === 'cooking' ? COOKING.steps.length : type === 'puzzle' ? round.pieces.length : 3;
+    for (let step = 0; step < total; step++) {
+      const current = state.snapshot.round;
+      const answer = type === 'fishing' ? frequencyRecords[era][step].word : extraTarget(current);
+      assert.equal(state.submitExtra(answer), step === total - 1 ? 'complete' : 'correct', `${era} ${type} ${step}`);
+    }
+    assert.equal(state.snapshot.missions, 1);
+    assert.equal(state.snapshot.progress[era], 10);
+    assert.equal(state.submitExtra(extraTarget(round)), 'ignored');
+  }
+});
 test('wiring uses the terminal era, requires three correct pairs and awards once', () => {
-  const state = new GameState();
+  const state = new GameState(undefined, () => .92);
   assert.equal(state.connect('kim', 'kim'), 'ignored');
   assert.equal(state.openTerminal('1999'), false);
   state.openTerminal('1920');
@@ -38,7 +81,7 @@ test('wiring uses the terminal era, requires three correct pairs and awards once
   state.nextRound(); solve(state, '1920'); assert.equal(state.snapshot.missions, 2);
 });
 test('closing cancels unfinished work; snapshots cannot inject answers', () => {
-  const state = new GameState(); state.openTerminal('1930'); state.connect('kim', 'kim');
+  const state = new GameState(undefined, () => .92); state.openTerminal('1930'); state.connect('kim', 'kim');
   state.nextRound(); assert.deepEqual(state.snapshot.round.matched, ['kim']);
   state.snapshot.round.matched.push('lee', 'yi');
   state.closeTerminal(); assert.equal(state.snapshot.round, null);
@@ -46,7 +89,7 @@ test('closing cancels unfinished work; snapshots cannot inject answers', () => {
   state.connect('yi', 'yi'); assert.equal(state.snapshot.missions, 0);
 });
 test('frequency requires three tuned signals per era and rewards once', () => {
-  const state = new GameState(); state.openTerminal('1950'); state.chooseGame('frequency');
+  const state = new GameState(undefined, () => .78); state.openTerminal('1950'); state.chooseGame('frequency');
   assert.equal(state.lockFrequency(), 'incorrect');
   assert.equal(state.connect('son', 'son'), 'ignored');
   for (let stage = 0; stage < 3; stage++) {
@@ -55,7 +98,7 @@ test('frequency requires three tuned signals per era and rewards once', () => {
   }
   assert.equal(state.snapshot.progress['1950'], 10);
   assert.equal(state.lockFrequency(), 'ignored');
-  state.tune(NaN); state.nextRound(); assert.equal(state.snapshot.round.stage, 0);
+  state.tune(NaN); state.nextRound(); state.chooseGame('frequency'); assert.equal(state.snapshot.round.stage, 0);
   state.tune(999); assert.equal(state.snapshot.round.value, 100);
 });
 test('broken terminals cannot be opened until the chronology repair is solved in order', () => {

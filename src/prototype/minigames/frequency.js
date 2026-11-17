@@ -1,6 +1,11 @@
 // Keywords introduce a literary tendency; they are not exclusive classifications.
 const freeze = list => Object.freeze(list.map(record => Object.freeze(record)));
 export const frequencyRecords = Object.freeze({
+  1910: freeze([
+    { word:'계몽', description:'새로운 지식과 생활을 알리려는 문학이 등장합니다.' },
+    { word:'근대 소설', description:'새로운 서술 방식의 장편소설이 전개됩니다.' },
+    { word:'문예지', description:'1919년 「창조」 같은 문예 동인지가 나옵니다.' },
+  ]),
   1920: freeze([
     { word: '동인지', description: '뜻이 맞는 문인들이 동인지를 펴내며 근대 문학을 일구어 갑니다.' },
     { word: '사실주의', description: '식민지 현실과 가난한 삶을 있는 그대로 그리려 합니다.' },
@@ -20,6 +25,21 @@ export const frequencyRecords = Object.freeze({
     { word: '전쟁', description: '한국 전쟁의 상처가 문학의 중심 소재가 됩니다.' },
     { word: '전후 현실', description: '가난과 혼란 속에서 살아가는 사람들의 모습을 그립니다.' },
     { word: '실존', description: '불안한 시대 속 인간 존재의 의미를 묻습니다.' },
+  ]),
+  1960: freeze([
+    { word:'분단', description:'남북 분단의 현실을 작품 속에서 성찰합니다.' },
+    { word:'도시', description:'도시인의 내면과 일상을 탐색합니다.' },
+    { word:'풍자', description:'시대에 따라 변하는 인물의 모습을 비판합니다.' },
+  ]),
+  1970: freeze([
+    { word:'산업화', description:'급격한 산업화가 삶에 남긴 흔적을 담습니다.' },
+    { word:'노동', description:'노동자와 도시 빈민의 현실을 바라봅니다.' },
+    { word:'풍자', description:'사회 부조리를 날카롭게 비판합니다.' },
+  ]),
+  1980: freeze([
+    { word:'민중', description:'일하는 사람들의 삶과 목소리를 기록합니다.' },
+    { word:'소시민', description:'도시 변두리 이웃들의 일상을 그립니다.' },
+    { word:'권력', description:'집단 안에서 작동하는 권력을 돌아봅니다.' },
   ]),
 });
 export const TOLERANCE = 3;

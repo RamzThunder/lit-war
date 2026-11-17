@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2030 · 미니게임 실험실</title>
+  <link rel="stylesheet" href="/src/minigames-demo.css">
+</head>
+<body>
+  <main class="shell">
+    <header><a href="/">← 본 게임으로</a><span>2030 / ARCHIVE LAB</span></header>
+    <section class="intro"><p class="eyebrow">SINGLE PLAYER TEST ROOM</p><h1>미니게임 실험실</h1><p>시대와 미션을 골라 바로 플레이해 보세요. 서버 접속 없이 브라우저에서만 진행됩니다.</p></section>
+    <section class="layout">
+      <aside class="selector"><label for="era">기록실 시대</label><select id="era"></select><p class="eyebrow">MISSION SELECT</p><div id="mission-list"></div><button id="new-round" type="button">같은 미션 다시 하기 ↻</button></aside>
+      <article class="screen"><div class="screen-head"><span id="mission-code">ARCHIVE</span><span id="mission-progress">0 / 3</span></div><h2 id="mission-title"></h2><p id="mission-instruction"></p><div id="mission-content"></div><p id="feedback" role="status" aria-live="polite"></p><div id="completed" hidden><strong>데이터 복원 완료</strong><p>이 미션은 실제 게임에서 완료 시 해당 시대 점수 +10이 됩니다.</p><button id="replay" type="button">다시 플레이</button></div></article>
+    </section>
+    <footer>연습용 미리보기 · 점수와 기록은 저장하지 않습니다.</footer>
+  </main>
+  <script type="module" src="/src/minigames-demo.js"></script>
+</body>
+</html>

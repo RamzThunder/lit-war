@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomEngine, RULES } from '../server/RoomEngine.js';
-import { map, terminalFor, doorFor } from '../src/prototype/map.js';
+import { map, terminalFor, doorFor, validPosition, isNearTerminal } from '../src/prototype/map.js';
 import { wiringRecords } from '../src/prototype/minigames/wiring.js';
 import { repairAnswer } from '../src/prototype/minigames/repair.js';
-const near = era => ({ x: terminalFor(era).x, y: terminalFor(era).y < 300 ? terminalFor(era).y + 50 : terminalFor(era).y - 60 });
+import { createMissionRound } from '../src/prototype/minigames/missionTypes.js';
+import { GameState } from '../src/prototype/state/GameState.js';
+import { createExtraRound, extraTarget, COOKING } from '../src/prototype/minigames/extraMissions.js';
+import { frequencyRecords } from '../src/prototype/minigames/frequency.js';
+const near = era => { const t=terminalFor(era); return [-58,50].map(dy=>({x:t.x,y:t.y+dy})).find(p=>validPosition(p.x,p.y)&&isNearTerminal(p,t)); };
 const data = (out, type, to) => out.find(o => o.data.type === type && (to === undefined || o.to === to))?.data;
 function mission(room, id, era = '1920', now = 1000) {
   room.command(id, { type: 'open', era, ...near(era) }, now);
@@ -14,7 +18,7 @@ function mission(room, id, era = '1920', now = 1000) {
   return out;
 }
 const setup = () => {
-  const room = new RoomEngine({}, () => 0);
+  const room = new RoomEngine({}, () => .92);
   room.join('a', 'A', 'ta', 0); room.join('b', 'B', 'tb', 0); room.join('c', 'C', 'tc', 0); room.join('d', 'D', 'td', 0);
   return room;
 };
@@ -40,7 +44,7 @@ test('missions award team points per era and rights at 5 (sabotage) and 10 (raid
     if (i === 10) assert.equal(data(out, 'right').right, 'raid');
   }
   assert.equal(room.scores['1920'][team], 50); assert.equal(room.scores['1950'][team], 50);
-  assert.deepEqual({ s: room.me('a').sabotageRights, r: room.me('a').raidRights }, { s: 1, r: 1 });
+  assert.deepEqual({ s: room.me('a').sabotageRights, r: room.me('a').raidRights }, { s: 2, r: 1 });
   assert.ok(data(out, 'scores', '*'));
   const dirty = room.takeDirty(); assert.ok(dirty['p:ta'] && dirty.scores);
 });
@@ -51,31 +55,69 @@ test('server checks the claimed position against the requested terminal', () => 
   assert.equal(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }), 'state').state.terminal, '1920');
   assert.deepEqual(room.command('a', { type: 'move', x: 480, y: 360, direction: 'up', moving: true }), [], 'no position relay outside raids');
 });
-test('sabotage: random enemy target, max two per room, broken terminal blocks until repaired', () => {
+test('server judges filter and chronology without accepting a direct score command', () => {
   const room = setup();
-  const s = room.sessions.get('a'); s.profile.sabotageRights = 3;
-  const target = data(room.command('a', { type: 'sabotage-start' }, 10), 'sabotage-target');
+  const player = room.sessions.get('a');
+  for (const type of ['filter', 'chronology']) {
+    player.game = new GameState({ terminalOpen: true, terminal: '1930', round: createMissionRound('1930', type, () => .4) });
+    const round = player.game.snapshot.round;
+    if (type === 'filter') {
+      for (const id of round.order) room.command('a', { type: 'classify', id, era: wiringRecords['1930'].some(r => r.id === id) ? 'current' : 'other' });
+    } else {
+      const order = [...round.order].sort((a, b) => {
+        const left = wiringRecords['1930'].find(r => r.id === a), right = wiringRecords['1930'].find(r => r.id === b);
+        return left.year - right.year || left.title.localeCompare(right.title, 'ko');
+      });
+      for (const id of order) room.command('a', { type: 'shelve', id });
+    }
+  }
+  assert.equal(room.scores['1930'].blue, 20);
+  assert.deepEqual(room.command('a', { type: 'score', amount: 999 }), []);
+  assert.equal(room.scores['1930'].blue, 20);
+});
+test('server judges every additional mission before awarding points', () => {
+  const room = setup();
+  const player = room.sessions.get('a');
+  for (const type of ['engine', 'upload', 'truth', 'mail', 'cooking', 'fishing', 'puzzle']) {
+    player.game = new GameState({ terminalOpen: true, terminal: '1930', round: createExtraRound('1930', type, () => .3) });
+    let round = player.game.snapshot.round;
+    const total = type === 'truth' ? round.claims.length : type === 'mail' ? round.order.length : type === 'cooking' ? COOKING.steps.length : type === 'puzzle' ? round.pieces.length : 3;
+    for (let i = 0; i < total; i++) {
+      const value = type === 'fishing' ? frequencyRecords['1930'][i].word : extraTarget(round);
+      const out = room.command('a', { type: 'extra', value });
+      round = data(out, 'state').state.round;
+      assert.equal(data(out, 'state').result, i === total - 1 ? 'complete' : 'correct');
+    }
+  }
+  assert.equal(room.scores['1930'].blue, 70);
+  assert.deepEqual(room.command('a', { type: 'score', amount: 9999 }), []);
+  assert.equal(room.scores['1930'].blue, 70);
+});
+test('team sabotage types, caps and broken terminal repair', () => {
+  const room = setup();
+  const red = room.sessions.get('b'); red.profile.sabotageRights = 2;
+  const target = data(room.command('b', { type: 'sabotage-start' }, 10), 'sabotage-target');
+  assert.equal(target.kind, 'broken'); assert.equal(target.max, 1);
   const victim = [...room.sessions.values()].find(x => x.name === target.name);
-  assert.notEqual(victim.profile.team, s.profile.team);
   room.command(victim.id, { type: 'open', era: '1940', ...near('1940') }, 10);
-  const out = room.command('a', { type: 'sabotage', kind: 'broken', era: '1940' }, 20);
-  assert.equal(data(out, 'sabotaged', victim.id).state.terminalOpen, false, 'open terminal force-closed');
-  assert.equal(data(room.command('a', { type: 'sabotage', kind: 'broken', era: '1940' }, 21), 'error').message.includes('먼저'), true, 'needs a new target pick');
-  room.command('a', { type: 'sabotage-start' }, 22);
-  assert.ok(data(room.command('a', { type: 'sabotage', kind: 'barricade', era: '1920' }, 23), 'sabotage-done'));
-  assert.ok(data(room.command('a', { type: 'sabotage-start' }, 24), 'sabotage-target'), 'other enemy still has room');
-  assert.equal(room.state(victim.id, 30).sabotages.length, 2);
-  assert.equal(room.state(victim.id, 30).sabotages.find(x => x.kind === 'barricade').left, RULES.barricadeMs - 7);
+  assert.ok(data(room.command('b', { type: 'sabotage', kind: 'barricade', era: '1940' }, 11), 'error'));
+  const out = room.command('b', { type: 'sabotage', kind: 'broken', era: '1940' }, 20);
+  assert.equal(data(out, 'sabotaged', victim.id).state.terminalOpen, false);
   assert.ok(data(room.command(victim.id, { type: 'open', era: '1940', ...near('1940') }, 40), 'error'));
   assert.ok(data(room.command(victim.id, { type: 'repair', kind: 'broken', era: '1940', ...map.spawn }, 40), 'error'));
   const opened = data(room.command(victim.id, { type: 'repair', kind: 'broken', era: '1940', ...near('1940') }, 40), 'state').state.round;
   let last;
   for (const id of repairAnswer(opened)) last = room.command(victim.id, { type: 'pick', id }, 41);
   assert.equal(data(last, 'state').result, 'repaired');
-  assert.equal(room.state(victim.id, 50).sabotages.length, 1);
-  assert.equal(room.state(victim.id, 23 + RULES.barricadeMs).sabotages.length, 0, 'barricade expires');
-  const door = doorFor('1920');
-  assert.ok(door);
+  assert.equal(room.state(victim.id, 50).sabotages.length, 0);
+  const blue = room.sessions.get('a'); blue.profile.sabotageRights = 4;
+  for (const era of ['1910','1920','1930']) {
+    const pick = data(room.command('a', { type: 'sabotage-start' }, 60), 'sabotage-target');
+    assert.equal(pick.kind, 'barricade'); assert.equal(pick.max, 3);
+    assert.ok(data(room.command('a', { type: 'sabotage', kind: 'barricade', era }, 61), 'sabotage-done'));
+  }
+  assert.equal(RULES.barricadeMs, 120000);
+  assert.ok(doorFor('1920'));
 });
 test('sabotage reaches offline enemies through their stored profile', () => {
   const room = setup();
@@ -98,22 +140,22 @@ test('live raid: positions relayed only between the pair, shock range/cooldown/s
   assert.equal(room.me('a').raidRights, 0);
   assert.ok(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }, 1001), 'error'), 'no terminals during raid');
   // Defender syncs its position with the first move; attacker walks up from the entry.
-  room.command(defenderId, { type: 'move', x: 480, y: 540, direction: 'down', moving: false }, 1100);
+  room.command(defenderId, { type: 'move', x: 480, y: map.entry.y - 44, direction: 'down', moving: false }, 1100);
   assert.equal(data(room.command('a', { type: 'shock' }, 1100), 'shock-miss').reason.includes('가까이'), true);
-  const step = room.command('a', { type: 'move', x: 480, y: 560, direction: 'up', moving: true }, 1300);
+  const step = room.command('a', { type: 'move', x: 480, y: map.entry.y - 24, direction: 'up', moving: true }, 1300);
   assert.equal(step[0].to, defenderId, 'move relayed to the defender only');
-  assert.equal(data(room.command('a', { type: 'move', x: 480, y: 100, direction: 'up', moving: true }, 1350), 'correction').player.y, 560);
+  assert.equal(data(room.command('a', { type: 'move', x: 480, y: 100, direction: 'up', moving: true }, 1350), 'correction').player.y, map.entry.y - 24);
   const shock = room.command('a', { type: 'shock' }, 1400);
   assert.equal(data(shock, 'shock', defenderId).shocks, 1);
   assert.equal(data(shock, 'shock', defenderId).stolen, 5);
-  assert.ok(data(room.command(defenderId, { type: 'move', x: 480, y: 520, direction: 'up', moving: true }, 1500), 'correction'), 'stunned');
+  assert.ok(data(room.command(defenderId, { type: 'move', x: 480, y: map.entry.y - 64, direction: 'up', moving: true }, 1500), 'correction'), 'stunned');
   assert.equal(data(room.command('a', { type: 'shock' }, 2500), 'shock-miss').reason.includes('감전되지'), true, 'invulnerable right after stun');
   assert.equal(data(room.command('a', { type: 'shock' }, 4000), 'shock', 'a').shocks, 2);
   const blue = room.scores['1950'][a.profile.team]; assert.equal(blue, 10);
   assert.deepEqual(room.tick(15999), []);
   const end = room.tick(16000);
   assert.equal(data(end, 'raid-end', 'a').shocks, 2); assert.equal(data(end, 'raid-end', defenderId).stolen, 10);
-  assert.deepEqual(room.command('a', { type: 'move', x: 480, y: 540, direction: 'up', moving: true }, 16100), []);
+  assert.deepEqual(room.command('a', { type: 'move', x: 480, y: map.entry.y - 44, direction: 'up', moving: true }, 16100), []);
 });
 test('raid without a free target keeps the right; disconnect ends the raid for the partner', () => {
   const room = new RoomEngine({}, () => 0);

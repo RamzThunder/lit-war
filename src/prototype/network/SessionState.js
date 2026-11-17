@@ -143,7 +143,7 @@ export class SessionState {
     this.stopSocket(); this.online = false; this.connected = false; this.players.clear();
     if (this.raid) { this.raid = null; this.emit('raid-end', { aborted: true }); }
     this.me = null; this.scores = null; this.sabotageTarget = null;
-    this.status = '혼자 연습 중'; this.correction = { x: 480, y: 360 };
+    this.status = '혼자 연습 중'; this.correction = null;
     this.publish(); this.sessionChanged();
   }
   // Safety net if the server's raid-end never arrives (e.g. the room restarted).
@@ -157,7 +157,12 @@ export class SessionState {
     else this.local.closeTerminal();
   }
   nextRound() { if (this.online) this.send({ type: 'next' }); else this.local.nextRound(); }
-  chooseGame(game) { if (this.online) this.send({ type: 'choose', game }); else this.local.chooseGame(game); }
+  recall(word) { if (this.online) this.send({ type: 'recall', word }); else return this.local.recall(word); }
+  shoot(word) { if (this.online) this.send({ type: 'shoot', word }); else return this.local.shoot(word); }
+  verifyIdentity(author, work, swiped) { if (this.online) this.send({ type: 'identify', author, work, swiped }); else return this.local.verifyIdentity(author, work, swiped); }
+  classify(id, era) { if (this.online) this.send({ type: 'classify', id, era }); else return this.local.classify(id, era); }
+  shelve(id) { if (this.online) this.send({ type: 'shelve', id }); else return this.local.shelve(id); }
+  submitExtra(value) { if (this.online) this.send({ type: 'extra', value }); else return this.local.submitExtra(value); }
   tune(value) {
     if (!this.online) return this.local.tune(value);
     if (this.remote.round?.type === 'frequency' && !this.remote.round.complete && Number.isFinite(value)) { this.remote.round.value = Math.max(0, Math.min(100, Math.round(value))); this.publish(); }

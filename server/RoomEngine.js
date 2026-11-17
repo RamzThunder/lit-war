@@ -6,7 +6,7 @@ export const TEAMS = ['blue', 'red'];
 export const RULES = Object.freeze({
   sabotageEvery: 5, raidEvery: 10,
   raidMs: 15000, shockRange: 40, shockCooldown: 1000, stunMs: 1500, invulnMs: 1000, maxShocks: 5, steal: 5,
-  barricadeMs: 90000, maxSabotages: 2,
+  barricadeMs: 120000, maxBarricades: 3, maxBroken: 1,
 });
 const emptyScores = () => Object.fromEntries(ERAS.map(era => [era, { blue: 0, red: 0 }]));
 const newProfile = (name, team) => ({ name, team, sabotageRights: 0, raidRights: 0, game: { missions: 0, sabotages: [] } });
@@ -35,7 +35,7 @@ export class RoomEngine {
     let profile = this.profiles.get(token);
     if (!profile) { profile = newProfile(name, this.pickTeam()); this.profiles.set(token, profile); }
     profile.name = name; this.dirty.add(token);
-    return this.#attach({ id, name, token, profile, game: new GameState(profile.game) }, now);
+    return this.#attach({ id, name, token, profile, game: new GameState(profile.game, this.random) }, now);
   }
   #attach(session, now, player = null) {
     // Live raids are stored, so a session woken from hibernation rejoins its raid.
@@ -46,7 +46,7 @@ export class RoomEngine {
   restore(data, now = Date.now()) {
     const profile = this.profiles.get(data.token);
     if (!profile) return false;
-    this.#attach({ id: data.id, name: data.name, token: data.token, profile, game: new GameState({ ...profile.game, ...data.game }) }, now, data.player ?? null);
+    this.#attach({ id: data.id, name: data.name, token: data.token, profile, game: new GameState({ ...profile.game, ...data.game }, this.random) }, now, data.player ?? null);
     return true;
   }
   // Hibernation attachment: only the open round; persistent fields live in storage profiles.
@@ -130,10 +130,16 @@ export class RoomEngine {
       }
       case 'pick': result = s.game.pickRepair(message.id, now); if (result === 'repaired') this.#persist(s); break;
       case 'close': s.game.closeTerminal(); break;
-      case 'choose': s.game.chooseGame(message.game); break;
+      // Mission selection is random. A client cannot change the issued round.
       case 'next': s.game.nextRound(); break;
       case 'connect': result = s.game.connect(message.author, message.work); break;
       case 'lock': s.game.tune(message.value); result = s.game.lockFrequency(); break;
+      case 'recall': result = s.game.recall(message.word, now); break;
+      case 'shoot': result = s.game.shoot(message.word); break;
+      case 'identify': result = s.game.verifyIdentity(message.author, message.work, message.swiped); break;
+      case 'classify': result = s.game.classify(message.id, message.era); break;
+      case 'shelve': result = s.game.shelve(message.id); break;
+      case 'extra': result = s.game.submitExtra(message.value); break;
       case 'raid': return this.#startRaid(s, now);
       case 'sabotage-start': return this.#sabotageStart(s, now);
       case 'sabotage': return this.#sabotage(s, message, now);
@@ -147,8 +153,8 @@ export class RoomEngine {
     const { round, missions } = s.game.snapshot;
     this.scores[round.era][s.profile.team] += MISSION_POINTS; this.scoresDirty = true;
     let right = null;
+    if (missions % RULES.sabotageEvery === 0) { s.profile.sabotageRights++; right = 'sabotage'; }
     if (missions % RULES.raidEvery === 0) { s.profile.raidRights++; right = 'raid'; }
-    else if (missions % RULES.sabotageEvery === 0) { s.profile.sabotageRights++; right = 'sabotage'; }
     this.#persist(s);
     const out = [{ to: '*', data: { type: 'scores', scores: this.scores } }];
     if (right) out.push({ to: s.id, data: { type: 'right', right, me: this.me(s.id) } });
@@ -238,16 +244,18 @@ export class RoomEngine {
   #sabotageStart(s, now) {
     const error = text => [{ to: s.id, data: { type: 'error', message: text } }];
     if (s.profile.sabotageRights < 1) return error('사보타주 권한이 없어요. 미션을 5개 깨면 생겨요.');
+    const kind = s.profile.team === 'blue' ? 'barricade' : 'broken';
+    const canTarget = token => this.#activeFor(token, now).filter(x => x.kind === kind).length < (kind === 'barricade' ? RULES.maxBarricades : RULES.maxBroken);
     const pending = s.pending && this.profiles.get(s.pending);
-    let token = pending && this.#activeFor(s.pending, now).length < RULES.maxSabotages ? s.pending : null;
+    let token = pending && canTarget(s.pending) ? s.pending : null;
     if (!token) {
-      const pool = [...this.profiles.entries()].filter(([t, p]) => p.team !== s.profile.team && this.#activeFor(t, now).length < RULES.maxSabotages).map(([t]) => t);
+      const pool = [...this.profiles.entries()].filter(([t, p]) => p.team !== s.profile.team && canTarget(t)).map(([t]) => t);
       if (!pool.length) return error('방해할 수 있는 상대 진영 방이 없어요. 권한은 그대로 남아 있어요.');
       token = pool[Math.floor(this.random() * pool.length)];
     }
     s.pending = token;
     const target = this.profiles.get(token);
-    return [{ to: s.id, data: { type: 'sabotage-target', name: target.name, team: target.team, sabotages: this.view(this.#activeFor(token, now), now), max: RULES.maxSabotages } }];
+    return [{ to: s.id, data: { type: 'sabotage-target', name: target.name, team: target.team, kind, sabotages: this.view(this.#activeFor(token, now), now), max: kind === 'barricade' ? RULES.maxBarricades : RULES.maxBroken } }];
   }
   #liveSession(token) { return [...this.sessions.values()].find(x => x.token === token); }
   #activeFor(token, now) {
@@ -258,9 +266,9 @@ export class RoomEngine {
     const error = text => [{ to: s.id, data: { type: 'error', message: text } }];
     const { kind, era } = message;
     if (!s.pending || s.profile.sabotageRights < 1) return error('먼저 사보타주 대상을 정하세요.');
-    if (!['barricade', 'broken'].includes(kind) || !ERAS.includes(era)) return error('잘못된 위치예요.');
+    if (kind !== (s.profile.team === 'blue' ? 'barricade' : 'broken') || !ERAS.includes(era)) return error('진영 권한에 맞지 않는 방해 공작이에요.');
     const active = this.#activeFor(s.pending, now);
-    if (active.length >= RULES.maxSabotages) return error('이 방에는 더 이상 방해 공작을 걸 수 없어요.');
+    if (active.filter(x => x.kind === kind).length >= (kind === 'barricade' ? RULES.maxBarricades : RULES.maxBroken)) return error('이 방에는 더 이상 방해 공작을 걸 수 없어요.');
     if (active.some(x => x.kind === kind && x.era === era)) return error('이미 방해 공작이 걸린 곳이에요.');
     const blocked = new Set([...active, { era }].map(x => x.era));
     if (blocked.size >= ERAS.length) return error('모든 단말기를 막을 수는 없어요.');

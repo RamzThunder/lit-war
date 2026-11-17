@@ -45,10 +45,11 @@ export function bindHud(state) {
     if (me) {
       const toSabotage = 5 - (missions % 5);
       const toRaid = 10 - (missions % 10);
-      $('#next-right').textContent = toRaid <= 5 ? `⚡ 실시간 공격권까지 ${toRaid}개` : `🛠 사보타주까지 ${toSabotage}개`;
+      $('#next-right').textContent = `🛠 ${me.team === 'blue' ? '바리케이드' : '단말기 고장'}까지 ${toSabotage}개 · ⚡ 공격까지 ${toRaid}개`;
     } else $('#next-right').textContent = '교실에 입장하면 5개마다 공격권이 생겨요';
     const busy = !state.connected || Boolean(state.raid);
     $('#use-sabotage').querySelector('b').textContent = me?.sabotageRights ?? 0;
+    $('#use-sabotage').firstChild.textContent = `🛠 ${me?.team === 'blue' ? '바리케이드' : me?.team === 'red' ? '단말기 고장' : '방해 권한'} `;
     $('#use-raid').querySelector('b').textContent = me?.raidRights ?? 0;
     $('#use-sabotage').disabled = busy || !me?.sabotageRights;
     $('#use-raid').disabled = busy || !me?.raidRights;

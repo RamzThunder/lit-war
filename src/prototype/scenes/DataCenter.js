@@ -19,7 +19,7 @@ export class DataCenter extends Phaser.Scene {
     r(24, 12, 912, 30, 0x263745); r(24, 45, 912, 4, 0x344c5b); r(24, 60, 912, 4, 0x080f18);
     for (let x = 48; x < 920; x += 112) { r(x, 22, 60, 4, 0x75c3c8); r(x, 26, 60, 20, 0x6ad4d3, .04); }
     // Hall floor guidance and doorway thresholds.
-    r(344, 248, 272, 2, 0x38505a); r(344, 470, 272, 2, 0x38505a);
+    for (let y = 240; y < map.height - 80; y += 278) r(344, y, 272, 2, 0x38505a);
     for (const d of map.doors) { r(d.x - 4, d.y - 4, d.width + 8, 4, 0x4d6b74); r(d.x - 4, d.y + d.height, d.width + 8, 4, 0x4d6b74); r(d.x, d.y, d.width, d.height, 0x1d2d38); }
     for (const o of map.racks) {
       r(o.x - 6, o.y + 10, o.width + 12, o.height + 4, 0x080f17, .65);
@@ -46,12 +46,11 @@ export class DataCenter extends Phaser.Scene {
       r(t.x - 32, t.y + 14, 64, 10, 0x283d48);
       for (let x = -24; x < 20; x += 6) r(t.x + x, t.y + 16, 4, 2, 0x819c9e);
       solid(terminalSolid(t));
-      const top = t.y < 300;
-      label(t.x, top ? 86 : t.y - 150, `ARCHIVE / ${t.era}`, 14, '#8aa9ad');
-      label(t.x, top ? 102 : t.y - 134, `${t.era}년대 기록실`, 9, '#77c3b8');
+      label(t.x, t.y - 54, `ARCHIVE / ${t.era}`, 14, '#8aa9ad');
+      label(t.x, t.y - 38, `${t.era}년대 기록실`, 9, '#77c3b8');
     }
-    label(480, 290, 'ARCHIVE HUB', 16, '#8aa9ad'); label(480, 308, 'LITERATURE DATA STORAGE', 8);
-    label(480, 600, 'SERVICE HATCH', 8, '#5d7680');
+    label(480, 580, 'ARCHIVE HUB', 16, '#8aa9ad'); label(480, 598, 'LITERATURE DATA STORAGE', 8);
+    label(480, 1130, 'SERVICE HATCH', 8, '#5d7680');
     // Sabotage overlays are rebuilt whenever the visible room's sabotage list changes.
     this.blockers = this.physics.add.staticGroup();
     this.overlay = this.add.graphics().setDepth(5);
