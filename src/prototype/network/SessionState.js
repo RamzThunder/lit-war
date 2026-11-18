@@ -15,7 +15,20 @@ export class SessionState {
     this.remote = this.local.snapshot; this.me = null; this.scores = null; this.raid = null; this.sabotageTarget = null;
     this.local.subscribe(() => { if (!this.online) this.publish(); });
     this.correction = null; this.retry = 0;
-    this.events = new EventTarget();
+    this.events = new EventTarget(); this.lesson = null;
+  }
+  // Server sends remaining ms; keep a local deadline for the countdown.
+  setLesson(lesson, announce) {
+    const previous = this.lesson?.phase, hadEvent = Boolean(this.lesson?.event);
+    this.lesson = lesson ? { ...lesson, endsAt: lesson.left == null ? null : performance.now() + lesson.left, event: lesson.event ? { endsAt: performance.now() + lesson.event.left } : null } : null;
+    if (announce && lesson && Boolean(lesson.event) !== hadEvent) {
+      if (lesson.event) this.notice(this.me?.team === 'red' ? '⚠️ 오염 경보! 1분 동안 미션을 깨면 미끼를 심을 수 있어요 (점수 2배)' : '⚠️ 오염 경보! 러다이트가 미끼를 심어요. 오염된 기록을 찾아 정화하세요 (점수 2배)', 'bad');
+      else this.notice('오염 경보가 끝났어요.', 'info');
+    }
+    if (!announce || !lesson || previous === lesson.phase) return;
+    const text = { playing: ['▶ 게임 시작! 단말기에서 미션을 시작하세요.', 'good'], paused: ['⏸ 선생님이 게임을 잠시 멈췄어요.', 'warn'], ended: ['■ 게임 끝! 점령 현황을 확인하세요.', 'warn'], lobby: ['선생님이 시작할 때까지 기다려 주세요.', 'info'] }[lesson.phase];
+    if (lesson.phase !== 'playing' && this.remote.terminalOpen) { this.remote.terminalOpen = false; this.remote.round = null; this.publish(); }
+    if (text) this.notice(...text);
   }
   get snapshot() { return this.online ? structuredClone(this.remote) : this.local.snapshot; }
   get inputBlocked() { return this.online && !this.connected; }
@@ -64,6 +77,8 @@ export class SessionState {
           clearTimeout(timeout); this.connected = true; this.retry = 0; this.id = event.id;
           this.players = new Map(event.players.map(player => [player.id, player]));
           this.setRemote(event.state); this.scores = event.scores; this.raid = null;
+          this.setLesson(event.lesson, false);
+          if (event.lesson?.phase === 'lobby') this.notice('선생님이 시작할 때까지 기다려 주세요.');
           this.status = '연결됨';
           clearInterval(this.heartbeat);
           this.heartbeat = setInterval(() => {
@@ -76,6 +91,19 @@ export class SessionState {
           if (event.result === 'repaired') this.notice('수리 완료! 다시 사용할 수 있어요.', 'good');
           break;
         case 'scores': this.scores = event.scores; break;
+        case 'lesson': this.setLesson(event.lesson, true); break;
+        case 'bait-offer': this.emit('bait-offer', event.offer); break;
+        case 'bait-result': this.emit('bait-result', event); this.notice(event.message, event.ok ? 'good' : 'warn'); break;
+        case 'contaminated':
+          this.setRemote(event.state); this.publish();
+          this.notice(`🧪 ${event.by}이(가) ${event.era}년대 단말기에 가짜 기록을 심었어요! 찾아서 정화하세요`, 'bad');
+          break;
+        case 'cleanse-result':
+          this.setRemote(event.state); this.publish(); this.emit('cleanse-result', event);
+          this.notice(event.correct ? `✨ 정화 성공! +${event.points}` : '정화 실패… 정답을 확인하세요', event.correct ? 'good' : 'warn');
+          break;
+        case 'trap-sprung': this.notice(`🪤 함정 발동! ${event.by}이(가) ${event.era}년대 함정에 걸렸어요`, 'good'); break;
+        case 'trap-penalty': this.notice(`🪤 함정이었어요! ${event.era}년대에서 ${event.stolen}점을 빼앗겼어요`, 'bad'); break;
         case 'right':
           this.notice(event.right === 'raid' ? '⚡ 실시간 공격권 획득! 상대 진영 방에 쳐들어갈 수 있어요.' : '🛠 사보타주 권한 획득! 상대 방에 방해 공작을 걸 수 있어요.', 'good');
           break;
@@ -84,7 +112,7 @@ export class SessionState {
         case 'raid':
           this.setRemote(event.state); this.publish();
           this.raid = {
-            role: event.role, opponent: { ...event.opponent, receivedAt: performance.now() }, endsAt: performance.now() + event.ms,
+            role: event.role, counter: Boolean(event.counter), opponent: { ...event.opponent, receivedAt: performance.now() }, endsAt: performance.now() + event.ms,
             shocks: 0, maxShocks: event.maxShocks, stunnedUntil: 0, entry: event.entry, room: localize(event.room), started: performance.now(),
           };
           this.emit('raid', this.raid);
@@ -108,7 +136,11 @@ export class SessionState {
           break;
         }
         case 'sabotage-target': this.sabotageTarget = { ...event, sabotages: localize(event.sabotages) }; this.emit('sabotage-target', this.sabotageTarget); break;
-        case 'sabotage-done': this.sabotageTarget = null; this.emit('sabotage-done', event); this.notice(`${event.name}의 방에 ${event.kind === 'broken' ? '단말기 고장' : '바리케이드'}를 걸었어요!`, 'good'); break;
+        case 'sabotage-done':
+          this.sabotageTarget = null; this.emit('sabotage-done', event);
+          if (event.trapped) this.notice(`🪤 ${event.name}의 함정이었어요! 고장은 실패했어요`, 'bad');
+          else this.notice(`${event.name}의 방에 ${event.kind === 'broken' ? '단말기 고장' : '바리케이드'}를 걸었어요!`, 'good');
+          break;
         case 'sabotaged':
           this.setRemote(event.state); this.publish();
           this.notice(`⚠️ ${event.by}이(가) ${event.era}년대 ${event.kind === 'broken' ? '단말기를 고장 냈어요!' : '통로에 바리케이드를 쳤어요!'}`, 'bad');
@@ -142,7 +174,7 @@ export class SessionState {
   leave() {
     this.stopSocket(); this.online = false; this.connected = false; this.players.clear();
     if (this.raid) { this.raid = null; this.emit('raid-end', { aborted: true }); }
-    this.me = null; this.scores = null; this.sabotageTarget = null;
+    this.me = null; this.scores = null; this.sabotageTarget = null; this.lesson = null;
     this.status = '혼자 연습 중'; this.correction = null;
     this.publish(); this.sessionChanged();
   }
@@ -175,6 +207,9 @@ export class SessionState {
   }
   pickRepair(id) { if (this.online) this.send({ type: 'pick', id }); }
   startRaid() { this.send({ type: 'raid' }); }
+  setTrap(era) { this.send({ type: 'trap', era }); }
+  plantBait(value) { this.send({ type: 'bait', value }); }
+  cleanse(id, value, at) { this.send({ type: 'cleanse', id, value, x: at.x, y: at.y }); }
   shock() { this.send({ type: 'shock' }); }
   startSabotage() { this.send({ type: 'sabotage-start' }); }
   placeSabotage(kind, era) { this.send({ type: 'sabotage', kind, era }); }

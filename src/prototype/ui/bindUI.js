@@ -1,6 +1,7 @@
 import { bindFrequency } from './bindFrequency.js';
 import { bindRepair } from './bindRepair.js';
 import { bindSabotage } from './bindSabotage.js';
+import { bindContam } from './bindContam.js';
 import { bindHud } from './bindHud.js';
 import { bindNewMissions } from './bindNewMissions.js';
 import { MISSION_LABEL } from '../minigames/missionTypes.js';
@@ -10,7 +11,7 @@ import { wiringRecords, eraLabel } from '../minigames/wiring.js';
 export function bindUI(state) {
   const $ = selector => document.querySelector(selector);
   const dialog = $('#terminal');
-  bindFrequency(state); bindRepair(state); bindSabotage(state); bindNewMissions(state);
+  bindFrequency(state); bindRepair(state); bindSabotage(state); bindNewMissions(state); bindContam(state);
   const hudTick = bindHud(state);
   let selected = null, previousRound = null, records = [];
   const close = () => { cancelDrag(); selected = null; state.closeTerminal(); };
@@ -73,7 +74,7 @@ export function bindUI(state) {
     const frequency = missionRound?.type === 'frequency';
     if (era) {
       $('#terminal-top').textContent = `SECURE TERMINAL / ARCHIVE ${era}`;
-      $('#terminal-eyebrow').textContent = `ARCHIVE REPAIR / ${era}s`;
+      $('#terminal-eyebrow').textContent = state.me?.team === 'red' ? `SOURCE EXTRACTION / ${era}s` : `ARCHIVE REPAIR / ${era}s`;
       $('#terminal-title').textContent = `${eraLabel(era)} 데이터 서버`;
       $('#terminal-coverage').textContent = eraScore(era);
     }
@@ -111,7 +112,7 @@ export function bindUI(state) {
     $('#return-game').hidden = !complete;
     $('#restored-records').hidden = !complete;
     if (complete) {
-      $('#terminal-feedback').textContent = `${MISSION_LABEL[missionRound.type]} 완료 · ${eraLabel(era)} +10점`;
+      $('#terminal-feedback').textContent = state.me?.team === 'red' ? `원본 탈취 완료! 인간의 기록으로 빼돌렸다 · ${eraLabel(era)} +10점` : `${MISSION_LABEL[missionRound.type]} 완료 · ${eraLabel(era)} +10점`;
       $('#restored-records').replaceChildren(...(frequency ? frequencyRecords[era] : records).map(r => {
         const line = document.createElement('p');
         line.textContent = frequency ? `${r.word} — ${r.description}` : `${r.author} — 「${r.title}」 (${r.year}${r.yearNote ? ` ${r.yearNote}` : ''}) · ${r.keyword}`;
@@ -136,6 +137,7 @@ export function bindUI(state) {
       status = stunned ? '감전! 잠시 움직일 수 없어요' : '침입자에게서 도망가세요!';
     } else if (open) status = '작업 중 · 이동 잠금';
     else if (target?.action === 'open') { prompt = `<kbd>E</kbd> ${eraLabel(target.era)} 데이터 서버 접속`; status = '접속 가능 · E 키를 누르세요'; }
+    else if (target?.action === 'cleanse') { prompt = `<kbd>E</kbd> 🧪 오염된 기록 정화`; status = '가짜 기록 발견 · E 키로 정화 (기회 한 번)'; }
     else if (target?.action === 'repair') { prompt = `<kbd>E</kbd> ${target.kind === 'broken' ? '고장 난 단말기 수리' : '바리케이드 치우기'}`; status = '방해 공작 발견 · E 키로 수리'; }
     else status = '단말기에 접근하세요';
     $('#interaction').innerHTML = prompt;

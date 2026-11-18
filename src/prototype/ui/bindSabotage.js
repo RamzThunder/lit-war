@@ -1,3 +1,4 @@
+import { teamName } from '../teams.js';
 import { map } from '../map.js';
 import { eraLabel } from '../minigames/wiring.js';
 const pct = (value, total) => `${(value / total) * 100}%`;
@@ -33,7 +34,7 @@ export function bindSabotage(state) {
     board.append(tag);
   }
   const render = target => {
-    $('#sabotage-title').textContent = `${target.team === 'red' ? '홍팀' : '청팀'} · ${target.name}의 방`;
+    $('#sabotage-title').textContent = `${teamName(target.team)} · ${target.name}의 방`;
     $('#sabotage-description').textContent = target.kind === 'barricade' ? '상대 방의 통로를 골라 바리케이드를 설치하세요. 120초 뒤 자동 해제되며, 상대가 수리할 수도 있습니다.' : '상대 방의 단말기 한 곳을 골라 고장 내세요. 상대가 수리할 때까지 사용할 수 없습니다.';
     const full = target.sabotages.filter(s => s.kind === target.kind).length >= target.max;
     for (const button of spots) {

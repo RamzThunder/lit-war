@@ -1,0 +1,100 @@
+/* Draft teacher / TV dashboard. Visual design is not final. */
+:root{--bg:#0b121a;--panel:#111d27;--line:#2b3e49;--text:#d4e1e5;--muted:#7f95a3;--accent:#86d8c0;--blue:#5c97e0;--blue-soft:#13284a;--red:#d8665d;--red-soft:#3d1a1a;color-scheme:dark;font-family:Pretendard,Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;word-break:keep-all}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer;border:1px solid #54877b;background:var(--accent);color:#16332e;padding:9px 14px;font-weight:bold}
+button:disabled{opacity:.35;cursor:default}
+button.ghost{background:transparent;color:var(--text);border-color:var(--line)}
+button.danger{background:#5a2420;color:#ffd0c8;border-color:#a0483f}
+input{font:inherit;background:#0d1d28;color:var(--text);border:1px solid #415e6a;padding:9px 10px}
+
+header{display:flex;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);background:#0d161f}
+.brand{font:28px monospace;letter-spacing:-2px}.brand span{color:var(--accent)}
+.title{color:var(--muted);font-size:14px}
+.room{font:16px monospace;color:var(--accent)}
+.conn{margin-left:auto;font-size:12px;color:var(--muted)}
+.conn.ok{color:var(--accent)}
+
+.panel{background:var(--panel);border:1px solid var(--line);padding:18px}
+h2{margin:0 0 14px;font-size:15px;color:#a6c1c9;font-weight:600}h2 small{color:var(--muted);font-weight:400;margin-left:6px}
+.join{max-width:440px;margin:60px auto}.join h1{margin:0 0 8px;font-size:24px}.join p{color:var(--muted);font-size:13px;line-height:1.7}
+.join label{display:flex;flex-direction:column;gap:6px;margin-top:16px;font-size:13px;color:#a6c1c9}
+.join button{width:100%;margin-top:20px;padding:13px}
+#room{text-transform:uppercase}
+.error{color:#f2b58f;min-height:20px}
+
+main{padding:20px 24px;display:grid;gap:16px;max-width:1600px;margin:auto}
+.top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px}
+.clock{display:flex;flex-direction:column;gap:10px}
+.phase{align-self:flex-start;padding:4px 12px;border:1px solid var(--line);font-size:13px}
+.phase.playing{border-color:#5a8a3a;color:#d6f0a8}.phase.paused,.phase.lobby{border-color:#8a7a3c;color:#f2dc9a}.phase.ended{border-color:#a0483f;color:#ffc9c2}
+#timer{font:clamp(48px,8vw,104px)/1 monospace;letter-spacing:-2px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.controls label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-right:6px}.controls input{width:64px}
+
+.totals{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;text-align:center}
+.team span{display:block;font-size:14px;color:var(--muted)}
+.team strong{display:block;font:clamp(48px,7vw,96px)/1.1 monospace}
+.team small{color:var(--muted)}
+.team.blue strong{color:#8fc3ff}.team.red strong{color:#ff9a8f}
+.vs{font:20px monospace;color:var(--muted)}
+
+.eras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.era{border:2px solid var(--line);padding:14px;background:#0f1a23;transition:border-color .3s,background .3s}
+.era.blue{border-color:var(--blue);background:var(--blue-soft)}.era.red{border-color:var(--red);background:var(--red-soft)}
+.era-head{display:flex;justify-content:space-between;align-items:baseline}
+.era-name{font-size:18px;font-weight:bold}.era-owner{font-size:12px;color:var(--muted)}
+.era.blue .era-owner{color:#bcd8ff}.era.red .era-owner{color:#ffc9c2}
+.era-bar{height:8px;background:var(--red);margin:12px 0 8px;position:relative}.era-bar i{position:absolute;inset:0 auto 0 0;background:var(--blue);transition:width .3s}
+.era-bar.empty{background:#293b44}.era-bar.empty i{background:transparent}
+.era-score{display:flex;justify-content:space-between;font:15px monospace}.era-score .b{color:#8fc3ff}.era-score .r{color:#ff9a8f}
+
+.bottom{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+.roster{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.roster ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.roster li{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#0f1a23;border-left:3px solid var(--line);font-size:14px}
+.roster ul.blue li{border-left-color:var(--blue)}.roster ul.red li{border-left-color:var(--red)}
+.roster li.offline{opacity:.45}
+.roster .dot{width:7px;height:7px;border-radius:50%;background:#4b5d66;flex:none}.roster li.online .dot{background:#73d7ba}
+.roster .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roster .missions{font:13px monospace;color:var(--muted)}
+.roster .tag{font-size:11px;color:#ffd08a}
+.roster button{padding:2px 8px;font-size:11px;background:transparent;color:var(--muted);border-color:var(--line);font-weight:400}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column-reverse;gap:6px;max-height:360px;overflow:auto;font-size:14px}
+.feed li{padding:6px 10px;background:#0f1a23;border-left:3px solid var(--line)}
+.feed li.blue{border-left-color:var(--blue)}.feed li.red{border-left-color:var(--red)}.feed li.lesson{border-left-color:var(--accent);color:var(--accent)}
+.feed time{font:11px monospace;color:var(--muted);margin-right:8px}
+.empty-note{color:var(--muted);font-size:13px}
+
+/* Live raid spectator */
+.arena-panel{border-color:#8c5a1f;background:#1a1409}
+.arena-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.arena-head h2{margin:0;color:#ffd08a}
+.arena-tabs{display:flex;gap:6px;flex-wrap:wrap}.arena-tabs button{padding:5px 10px;font-size:12px}.arena-tabs button.active{background:#ffd08a;border-color:#ffd08a;color:#2b1d00}
+.arena-banner{display:flex;align-items:center;gap:16px;margin:12px 0 10px;font-size:16px;flex-wrap:wrap}
+.arena-banner b.blue{color:#8fc3ff}.arena-banner b.red{color:#ff9a8f}
+#arena-stats{color:#ffe2a8}
+#arena-timer{margin-left:auto;font:32px monospace;color:#ffd08a}#arena-timer::after{content:'초';font-size:14px;margin-left:2px}
+.arena{position:relative;height:clamp(300px,48vh,560px);border:1px solid #4a3a1c;overflow:hidden;background:#101b25}
+.arena canvas{display:block;image-rendering:pixelated}
+.arena-result{margin-top:10px;padding:10px 14px;font-size:18px;font-weight:bold;text-align:center;background:#0f1a23;border:1px solid var(--line)}
+.arena-result.blue{color:#8fc3ff;border-color:var(--blue)}.arena-result.red{color:#ff9a8f;border-color:var(--red)}
+body.tv .arena{height:62vh}body.tv .arena-banner{font-size:22px}
+
+/* Contamination alert */
+button.alert{background:#4a2a6a;color:#e5ccff;border-color:#b07ae8}
+.event-chip{align-self:flex-start;padding:6px 12px;border:1px solid #b07ae8;background:#2a1440;color:#e5ccff;font-weight:bold;animation:alertPulse 1s infinite alternate}@keyframes alertPulse{to{box-shadow:0 0 14px #b07ae8aa}}@media(prefers-reduced-motion:reduce){.event-chip{animation:none}}
+.contam-panel{border-color:#6b4a92}
+.contam-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.contam-log li{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;background:#0f1a23;border-left:3px solid #b07ae8;font-size:14px}
+.contam-log s{color:#c79bff}.contam-log b{color:#9ff0d6}.contam-log .who{color:var(--muted);font-size:12px}
+.contam-log .status{font-size:12px;white-space:nowrap}.contam-log li.open .status{color:#ffb38a}.contam-log li.fixed{border-left-color:var(--accent)}.contam-log li.fixed .status{color:var(--accent)}.contam-log li.missed .status{color:#f2dc9a}
+@media(max-width:700px){.contam-log li{grid-template-columns:1fr 1fr}}
+
+/* TV mode: hide every control; big type for the classroom screen. */
+body.tv .teacher-only,body.tv .roster button{display:none}
+body.tv header .title{display:none}
+body.tv .era-name{font-size:24px}body.tv .era-score{font-size:20px}
+
+@media(max-width:900px){.top,.bottom{grid-template-columns:1fr}.eras{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){header{padding:12px 16px;gap:10px;flex-wrap:wrap}main{padding:16px}.roster{grid-template-columns:1fr}.title{display:none}}

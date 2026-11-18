@@ -16,6 +16,7 @@ export default {
   },
 };
 const HEARTBEAT_MS = 30000;
+const sha256 = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(b => b.toString(16).padStart(2, '0')).join('');
 // One Durable Object per class code. Scores and per-student profiles (team, mission count,
 // rights, sabotages) and live raids are stored; open rounds and raid positions survive
 // hibernation in socket attachments.
@@ -25,7 +26,7 @@ export class Classroom extends DurableObject {
     this.sockets = new Map();
     ctx.blockConcurrencyWhile(async () => {
       const profiles = await ctx.storage.list({ prefix: 'p:' });
-      this.room = new RoomEngine({ scores: await ctx.storage.get('scores'), raids: await ctx.storage.get('raids'), profiles: [...profiles].map(([key, value]) => [key.slice(2), value]) });
+      this.room = new RoomEngine({ scores: await ctx.storage.get('scores'), raids: await ctx.storage.get('raids'), lesson: await ctx.storage.get('lesson'), profiles: [...profiles].map(([key, value]) => [key.slice(2), value]) });
       for (const socket of ctx.getWebSockets()) {
         const data = socket.deserializeAttachment();
         if (data && this.room.restore(data)) this.sockets.set(data.id, socket);
@@ -39,7 +40,9 @@ export class Classroom extends DurableObject {
       if (to === '*') for (const socket of this.sockets.values()) this.send(socket, data);
       else if (this.sockets.has(to)) this.send(this.sockets.get(to), data);
     }
+    for (const { to, close } of out) if (close) this.remove(to, close, 'Kicked');
   }
+  async schedule() { const at = this.room.nextDeadline(); if (Number.isFinite(at)) await this.ensureAlarm(at); }
   attach(ids) {
     for (const id of ids) if (this.room.sessions.has(id) && this.sockets.has(id)) this.sockets.get(id).serializeAttachment(this.room.serialize(id));
   }
@@ -48,8 +51,27 @@ export class Classroom extends DurableObject {
     const current = await this.ctx.storage.getAlarm();
     if (!current || current > at) await this.ctx.storage.setAlarm(at);
   }
+  async fetchTeacher(url) {
+    const key = url.searchParams.get('key') ?? '';
+    if (key.length < 4 || key.length > 32) return new Response('Invalid teacher key', { status: 400 });
+    const pair = new WebSocketPair(); const [client, server] = Object.values(pair);
+    this.ctx.acceptWebSocket(server);
+    const id = crypto.randomUUID();
+    let welcome;
+    try { welcome = this.room.joinTeacher(id, await sha256(`${this.ctx.id}:${key}`)); }
+    catch (error) { this.send(server, { type: 'error', fatal: true, message: error.message }); server.close(4001, 'Join rejected'); return new Response(null, { status: 101, webSocket: client }); }
+    this.sockets.set(id, server);
+    server.serializeAttachment({ id, teacher: true });
+    this.send(server, welcome);
+    // Claiming a free room moves it to the lobby; tell the students already inside.
+    this.dispatch([{ to: '*', data: { type: 'lesson', lesson: this.room.lessonView() } }]);
+    await this.flush();
+    await this.ensureAlarm(Date.now() + HEARTBEAT_MS);
+    return new Response(null, { status: 101, webSocket: client });
+  }
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.searchParams.get('role') === 'teacher') return this.fetchTeacher(url);
     const name = (url.searchParams.get('name') ?? '').trim();
     const token = url.searchParams.get('token') ?? '';
     if (!/^[\p{L}\p{N}_ -]{1,12}$/u.test(name) || !/^[a-f0-9-]{36}$/.test(token)) return new Response('Invalid nickname or session', { status: 400 });
@@ -63,13 +85,14 @@ export class Classroom extends DurableObject {
     server.serializeAttachment(this.room.serialize(id));
     this.send(server, this.room.welcome(id));
     for (const [other, socket] of this.sockets) if (other !== id) this.send(socket, { type: 'joined', player: this.room.player(id) });
+    this.dispatch(this.room.teacherUpdate());
     await this.flush();
     await this.ensureAlarm(Date.now() + HEARTBEAT_MS);
     return new Response(null, { status: 101, webSocket: client });
   }
   async webSocketMessage(socket, raw) {
     const id = socket.deserializeAttachment()?.id;
-    if (!this.room.sessions.has(id)) return;
+    if (!this.room.sessions.has(id) && !this.room.isTeacher(id)) return;
     if (typeof raw !== 'string' || raw.length > 2048) { this.remove(id, 1009, 'Message too large'); return; }
     let message;
     try { message = JSON.parse(raw); } catch { return; }
@@ -78,7 +101,7 @@ export class Classroom extends DurableObject {
     this.dispatch(out);
     if (message.type !== 'ping') this.attach(new Set([id, ...out.map(o => o.to)].filter(to => to !== '*')));
     await this.flush();
-    if (out.some(o => o.data.type === 'raid')) await this.ensureAlarm(this.room.nextDeadline());
+    if (out.some(o => o.data.type === 'raid' || o.data.type === 'lesson')) await this.schedule();
   }
   remove(id, code = 1000, reason = 'Left') {
     const socket = this.sockets.get(id);
@@ -93,7 +116,7 @@ export class Classroom extends DurableObject {
   async alarm() {
     const now = Date.now();
     this.dispatch(this.room.tick(now));
-    for (const [id, s] of this.room.sessions) if (now - s.lastSeen > 60000) this.remove(id, 4002, 'Timed out');
+    for (const [id, s] of [...this.room.sessions, ...this.room.teachers]) if (now - s.lastSeen > 60000) this.remove(id, 4002, 'Timed out');
     await this.flush();
     if (this.sockets.size) await this.ctx.storage.setAlarm(Math.min(now + HEARTBEAT_MS, this.room.nextDeadline()));
   }

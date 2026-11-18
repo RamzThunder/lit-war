@@ -1,56 +1,18 @@
 import Phaser from 'phaser';
 import { map, movementVector, nearestTerminal, isNearDoor, terminalSolid, doorFor, terminalFor } from '../map.js';
 import { createTextures } from '../assets/createTextures.js';
+import { drawArchive, drawSabotages } from './drawArchive.js';
 const SHOCK_RANGE = 40;
 const TEAM_TINT = { blue: 0x8fc3ff, red: 0xff9a8f };
 export class DataCenter extends Phaser.Scene {
   constructor(state, updateContext, touch) { super('DataCenter'); this.state = state; this.updateContext = updateContext; this.touch = touch; this.direction = 'down'; }
   create() {
     createTextures(this);
-    this.add.tileSprite(0, 0, map.width, map.height, 'floor').setOrigin(0);
-    const g = this.add.graphics();
-    const r = (x, y, w, h, c, a = 1) => g.fillStyle(c, a).fillRect(x, y, w, h);
     this.solids = this.physics.add.staticGroup();
-    const solid = ({ x, y, width, height }, group = this.solids) => {
+    drawArchive(this, ({ x, y, width, height }) => {
       const zone = this.add.zone(x + width / 2, y + height / 2, width, height);
-      this.physics.add.existing(zone, true); group.add(zone); return zone;
-    };
-    map.walls.forEach(w => { r(w.x, w.y, w.width, w.height, 0x101a25); r(w.x, w.y, w.width, 3, 0x2a3b48); solid(w); });
-    r(24, 12, 912, 30, 0x263745); r(24, 45, 912, 4, 0x344c5b); r(24, 60, 912, 4, 0x080f18);
-    for (let x = 48; x < 920; x += 112) { r(x, 22, 60, 4, 0x75c3c8); r(x, 26, 60, 20, 0x6ad4d3, .04); }
-    // Hall floor guidance and doorway thresholds.
-    for (let y = 240; y < map.height - 80; y += 278) r(344, y, 272, 2, 0x38505a);
-    for (const d of map.doors) { r(d.x - 4, d.y - 4, d.width + 8, 4, 0x4d6b74); r(d.x - 4, d.y + d.height, d.width + 8, 4, 0x4d6b74); r(d.x, d.y, d.width, d.height, 0x1d2d38); }
-    for (const o of map.racks) {
-      r(o.x - 6, o.y + 10, o.width + 12, o.height + 4, 0x080f17, .65);
-      r(o.x - 4, o.y - 4, o.width + 8, o.height + 8, 0x2a414d);
-      r(o.x, o.y, o.width, o.height, 0x0e1722); r(o.x, o.y, o.width, 8, 0x3c5361);
-      for (let row = 0; row < 5; row++) {
-        const y = o.y + 14 + row * 18;
-        r(o.x + 4, y, 48, 14, 0x22333f); r(o.x + 8, y + 3, 25, 2, 0x101b26); r(o.x + 8, y + 8, 25, 2, 0x14232e);
-        r(o.x + 41, y + 4, 3, 3, row === 3 ? 0xc4a06a : 0x6ad5c6); r(o.x + 47, y + 4, 2, 3, 0x3f797b);
-      }
-      solid(o);
-    }
-    for (const o of map.crates) {
-      r(o.x + 4, o.y + 5, o.width, o.height, 0x0b151e);
-      r(o.x, o.y, o.width, o.height, 0x36414a); r(o.x + 3, o.y + 3, o.width - 6, o.height - 6, 0x26333c);
-      r(o.x + 8, o.y, 4, o.height, 0x52616a); r(o.x + o.width - 12, o.y, 4, o.height, 0x52616a); solid(o);
-    }
-    const label = (x, y, text, size = 10, color = '#69838c') => this.add.text(x, y, text, { fontFamily: 'monospace', fontSize: size, color }).setOrigin(.5);
-    for (const t of map.terminals) {
-      r(t.x - 48, t.y - 38, 96, 88, 0x51d6c3, .035);
-      r(t.x - 36, t.y - 26, 72, 52, 0x0a141e); r(t.x - 32, t.y - 24, 64, 38, 0x475e67);
-      r(t.x - 27, t.y - 20, 54, 25, 0x112c36); r(t.x - 24, t.y - 17, 48, 19, 0x53bfaf);
-      r(t.x - 20, t.y - 13, 30, 2, 0x173b40); r(t.x - 20, t.y - 8, 22, 2, 0x28615d);
-      r(t.x - 32, t.y + 14, 64, 10, 0x283d48);
-      for (let x = -24; x < 20; x += 6) r(t.x + x, t.y + 16, 4, 2, 0x819c9e);
-      solid(terminalSolid(t));
-      label(t.x, t.y - 54, `ARCHIVE / ${t.era}`, 14, '#8aa9ad');
-      label(t.x, t.y - 38, `${t.era}년대 기록실`, 9, '#77c3b8');
-    }
-    label(480, 580, 'ARCHIVE HUB', 16, '#8aa9ad'); label(480, 598, 'LITERATURE DATA STORAGE', 8);
-    label(480, 1130, 'SERVICE HATCH', 8, '#5d7680');
+      this.physics.add.existing(zone, true); this.solids.add(zone);
+    });
     // Sabotage overlays are rebuilt whenever the visible room's sabotage list changes.
     this.blockers = this.physics.add.staticGroup();
     this.overlay = this.add.graphics().setDepth(5);
@@ -125,6 +87,8 @@ export class DataCenter extends Phaser.Scene {
     const terminal = nearestTerminal(this.player);
     if (!terminal) return null;
     if (sabotages.some(s => s.kind === 'broken' && s.era === terminal.era)) return { action: 'repair', kind: 'broken', era: terminal.era };
+    const contam = sabotages.find(s => s.kind === 'contam' && s.era === terminal.era);
+    if (contam) return { action: 'cleanse', era: terminal.era, item: contam };
     return { action: 'open', era: terminal.era };
   }
   interact() {
@@ -133,32 +97,22 @@ export class DataCenter extends Phaser.Scene {
     if (!target) return;
     this.player.setVelocity(0);
     const at = { x: Math.round(this.player.x * 10) / 10, y: Math.round(this.player.y * 10) / 10 };
-    if (target.action === 'open') this.state.openTerminal(target.era, at);
+    if (target.action === 'cleanse') this.state.emit('cleanse-open', { item: target.item, at });
+    else if (target.action === 'open') this.state.openTerminal(target.era, at);
     else this.state.openRepair(target.kind, target.era, at);
   }
   renderSabotages() {
-    const list = this.state.roomSabotages();
+    const trap = this.state.raid?.role !== 'attacker' && this.state.me?.trap;
+    const list = [...this.state.roomSabotages(), ...(trap ? [{ kind: 'trap', era: trap }] : [])];
     const signature = list.map(s => `${s.kind}:${s.era}`).sort().join('|');
     if (signature === this.sabotageSignature) return;
     this.sabotageSignature = signature;
     this.blockers.clear(true, true); this.overlay.clear();
     this.overlayLabels.forEach(text => text.destroy()); this.overlayLabels = [];
-    const r = (x, y, w, h, c, a = 1) => this.overlay.fillStyle(c, a).fillRect(x, y, w, h);
-    for (const s of list) {
-      if (s.kind === 'barricade') {
-        const d = doorFor(s.era);
-        r(d.x - 2, d.y, d.width + 4, d.height, 0x3a2a12);
-        for (let y = d.y; y < d.y + d.height; y += 12) { r(d.x - 2, y, d.width + 4, 6, 0xe0b23c); r(d.x - 2, y + 6, d.width + 4, 6, 0x24221d); }
-        const zone = this.add.zone(d.x + d.width / 2, d.y + d.height / 2, d.width, d.height);
-        this.physics.add.existing(zone, true); this.blockers.add(zone);
-        this.overlayLabels.push(this.add.text(d.x + d.width / 2, d.y - 10, '🚧', { fontSize: '12px' }).setOrigin(.5).setDepth(6));
-      } else {
-        const t = terminalFor(s.era);
-        r(t.x - 24, t.y - 17, 48, 19, 0x5b1f24);
-        r(t.x - 20, t.y - 15, 4, 15, 0xff6b6b); r(t.x - 6, t.y - 15, 3, 12, 0xff6b6b); r(t.x + 10, t.y - 13, 4, 11, 0xff6b6b);
-        this.overlayLabels.push(this.add.text(t.x, t.y - 34, '💥 고장', { fontSize: '10px', fontFamily: 'sans-serif', color: '#ffb3a8', backgroundColor: '#2a1014' }).setOrigin(.5).setDepth(6));
-      }
-    }
+    this.overlayLabels = drawSabotages(this, this.overlay, list, d => {
+      const zone = this.add.zone(d.x + d.width / 2, d.y + d.height / 2, d.width, d.height);
+      this.physics.add.existing(zone, true); this.blockers.add(zone);
+    });
   }
   update(time, delta) {
     const k = this.keys;

@@ -5,3 +5,5 @@ build/
 .wrangler/
 .dev.vars
 build-worker/
+.claude/settings.local.json
+.claude/dev.log

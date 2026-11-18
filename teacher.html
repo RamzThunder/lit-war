@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a121b">
+  <title>2030 · 교사용 화면</title>
+  <link rel="stylesheet" href="/src/teacher/teacher.css">
+</head>
+<body>
+  <header>
+    <b class="brand">2030<span>_</span></b>
+    <span class="title">교사용 화면</span>
+    <span id="room-label" class="room"></span>
+    <span id="conn" class="conn">접속 전</span>
+    <button id="tv-toggle" type="button" class="ghost">TV 모드</button>
+  </header>
+
+  <section id="join" class="panel join">
+    <h1>교실 열기</h1>
+    <p>학생들과 같은 방 코드를 입력하세요. 처음 들어가면 입력한 비밀번호가 이 방의 교사 비밀번호가 되고, 학생들은 선생님이 시작할 때까지 기다립니다.</p>
+    <form id="join-form">
+      <label>방 코드 <input id="room" required minlength="4" maxlength="12" pattern="[A-Za-z0-9]{4,12}" placeholder="CLASS301" autocomplete="off"></label>
+      <label>교사 비밀번호 <input id="key" type="password" required minlength="4" maxlength="32" placeholder="4자 이상"></label>
+      <button type="submit">들어가기</button>
+      <p id="join-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <main id="dash" hidden>
+    <section class="top">
+      <div class="clock panel">
+        <span id="phase" class="phase">대기</span>
+        <strong id="timer">--:--</strong>
+        <div class="controls teacher-only">
+          <label>시간 <input id="minutes" type="number" min="1" max="90" value="30">분</label>
+          <button id="start" type="button">▶ 시작</button>
+          <button id="pause" type="button">⏸ 멈춤</button>
+          <button id="resume" type="button">▶ 계속</button>
+          <button id="end" type="button" class="danger">■ 종료</button>
+          <button id="reset" type="button" class="ghost">↺ 초기화</button>
+          <button id="event" type="button" class="alert">⚠️ 오염 경보</button>
+        </div>
+        <span id="event-chip" class="event-chip" hidden></span>
+      </div>
+      <div class="totals panel">
+        <div class="team blue"><span id="name-blue">인류유산 보존관</span><strong id="total-blue">0</strong><small id="count-blue">0명</small></div>
+        <div class="vs">VS</div>
+        <div class="team red"><span id="name-red">러다이트</span><strong id="total-red">0</strong><small id="count-red">0명</small></div>
+      </div>
+    </section>
+
+    <section id="arena-panel" class="panel arena-panel" hidden>
+      <div class="arena-head">
+        <h2>⚡ 실시간 공격 중계</h2>
+        <div id="arena-tabs" class="arena-tabs"></div>
+      </div>
+      <div class="arena-banner" aria-live="polite">
+        <span id="arena-title"></span>
+        <span id="arena-stats"></span>
+        <strong id="arena-timer">15</strong>
+      </div>
+      <div id="arena" class="arena"></div>
+      <div id="arena-result" class="arena-result" hidden></div>
+    </section>
+
+    <section id="contam-panel" class="panel contam-panel" hidden>
+      <h2>🧪 오염 기록 <small>가짜 → 진짜</small></h2>
+      <ol id="contam-log" class="contam-log"></ol>
+    </section>
+
+    <section class="panel">
+      <h2>시대별 점령 현황</h2>
+      <div id="eras" class="eras"></div>
+    </section>
+
+    <section class="bottom">
+      <div class="panel">
+        <h2>학생 <small id="online-count"></small></h2>
+        <div class="roster"><ul id="roster-blue" class="blue"></ul><ul id="roster-red" class="red"></ul></div>
+      </div>
+      <div class="panel">
+        <h2>실시간 소식</h2>
+        <ol id="feed" class="feed"></ol>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/teacher/teacher.js"></script>
+</body>
+</html>

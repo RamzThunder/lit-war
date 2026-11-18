@@ -7,6 +7,8 @@ import { bindUI } from './ui/bindUI.js';
 import { bindTouch } from './ui/bindTouch.js';
 const state = new SessionState();
 bindSession(state);
+// Dev-only handle for automated browser checks; not included in production builds.
+if (import.meta.env.DEV) window.__litwar = state;
 const updateContext = bindUI(state);
 const touch = bindTouch();
 new Phaser.Game({

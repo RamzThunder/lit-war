@@ -27,6 +27,7 @@ export class GameState {
     if (active.length !== this.#state.sabotages.length) this.#publish({ sabotages: active });
   }
   addSabotage(sabotage) { this.#publish({ sabotages: [...this.#state.sabotages, sabotage] }); }
+  removeSabotage(predicate) { this.#publish({ sabotages: this.#state.sabotages.filter(s => !predicate(s)) }); }
   #newRound(era, type = null, now = Date.now()) {
     if (!type) { const pool = era === COOKING.era ? MISSION_POOL : MISSION_POOL.filter(item => item !== 'cooking'); type = pool[Math.floor(this.random() * pool.length)]; }
     if (type === 'frequency') return createFrequencyRound(era, this.random);
