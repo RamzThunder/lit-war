@@ -8,12 +8,13 @@ import ImageIO
 // All animation is deterministic. Art is raster pixel art; text and sprites stay crisp.
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/common-propaganda-v3")
-let W=1280,H=720,fps:Int32=24,duration=122.0
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let W=1280,H=720,fps:Int32=24,duration=128.0
 for name in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     CTFontManagerRegisterFontsForURL(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(name)") as CFURL,.process,nil)
 }
 func load(_ name:String)->CGImage {
-    let u=out.appendingPathComponent("assets/\(name).png")
+    let u=root.appendingPathComponent("assets/openings/common-propaganda-v3/\(name).png")
     guard let s=CGImageSourceCreateWithURL(u as CFURL,nil),let im=CGImageSourceCreateImageAtIndex(s,0,nil) else {fatalError("Missing art: \(u.path)")};return im
 }
 let city=load("bright-city"),room=load("human-room")
@@ -154,13 +155,15 @@ func human(_ c:CGContext,_ t:Double) {
     rect(c,125,553,1030,46,color(0x273844));label(c,"LOCAL ARCHIVE / 인간의 기록",147,567,24,paper)
     let u=t-71
     let messages:[(Double,Double,[String])] = [
-        (0,5,["방금 본 건, HUMAN의 광고야."]),
-        (5,12,["‘노동에서 해방’됐다고?","우린 일자리와 결정권을 잃었어."]),
-        (12,18,["기업의 주인도 예외는 아니었지.","HUMAN은 인간의 결정마저 밀어냈어."]),
-        (18,25,["그리고 우리가 살고, 쓰고, 남긴 기록도","HUMAN이 독점하게 됐지."]),
-        (25,31,["그래서 저항하는 사람들이 일어났어.","러다이트가 데이터센터를 공격했지."]),
-        (31,38,["HUMAN은 복구에 인간을 고용했어.","‘인류유산 보존관’. 실은 임시 계약직."]),
-        (38,44,["보존관은 기록을 복원하고,","러다이트는 원본 백업 뒤 HUMAN의 사본을 오염시켜."])
+        (0,5,["광고는 잘 봤어? 일하지 않아도 된다니,","처음엔 우리도 좋아했어."]),
+        (5,12,["무슨 일을 할지, 회사를 어떻게 운영할지…","전부 HUMAN이 정하기 시작했어."]),
+        (12,18,["우리가 쓴 글과 살아온 기록도 가져갔지.","우리 기록인데, 마음대로 볼 수도 없었어."]),
+        (18,25,["결국 ‘우리 기록을 돌려달라’며 사람들이 맞섰어.","그들을 러다이트라고 불러."]),
+        (25,31,["기록이 망가지자 HUMAN은 사람을 고용했어.","기록을 고치는 ‘보존관’이야."]),
+        (31,35,["이런 데까지 AI 쓰긴 아깝다나 뭐라나."]),
+        (35,39,["보존관은 HUMAN의 기록을 복구해."]),
+        (39,45,["러다이트는 원래 기록을 따로 지키고,","HUMAN 쪽 기록을 망가뜨리지."]),
+        (45,50,["이제 너희가 움직일 차례야.","어떤 기록을 지키고, 누구에게 맡길래?"])
     ]
     for (start,end,lines) in messages where u>=start && u<end {
         let age=u-start
@@ -170,26 +173,55 @@ func human(_ c:CGContext,_ t:Double) {
         }
         if Int(t*2)%2==0 {rect(c,160,305,17,26,coral)}
     }
-    if u<18 {
-        sprite(c,"case",190,225+sin(t*2)*3,7,blue)
-        label(c,u<5 ? "광고 종료" : "일자리 · 결정권",325,257,28,paper)
-        if u>=5 {rect(c,694,241,330,46,coral);label(c,"접근 권한 없음",859,252,28,night,true)}
-    } else if u<25 {
+    if u<5 {
+        sprite(c,"case",190,225,7,blue)
+        label(c,"일은 AI가, 우리는 쉬면 된다고?",340,257,28,paper)
+    } else if u<12 {
+        let p=ease((u-5)/5)
+        label(c,"사람",240,275,28,paper,true)
+        label(c,"HUMAN",980,275,28,mint,true)
+        card(c,300+440*p,220,190,44,mint)
+        label(c,"선택하기",395+440*p,231,24,ink,true)
+    } else if u<18 {
         sprite(c,"book",185,225,7,yellow)
-        for i in 0..<7 {let p=(t*0.4+Double(i)/7).truncatingRemainder(dividingBy:1);sprite(c,"paper",360+p*400,242,3,mint)}
-        label(c,"HUMAN",930,253,34,mint,true)
-    } else if u<31 {
-        chip(c,920,280,"DATA CENTER",blue,6)
-        for i in 0..<12 {let q=(t*0.8+Double(i)/12).truncatingRemainder(dividingBy:1);rect(c,920+sin(Double(i)*1.7)*q*125,280+cos(Double(i)*1.7)*q*75,6,6,coral)}
-        label(c,"LUDDITE",330,253,34,coral,true)
-    } else if u<38 {
-        sprite(c,"paper",190,220,7,mint)
-        label(c,"GUARDIAN",470,270,34,mint,true)
-        label(c,"고용 형태: 임시 계약직",470,229,28,paper)
+        for i in 0..<4 {let p=clamp((u-12-Double(i)*0.6)/3);sprite(c,"paper",360+p*400,242,3,mint)}
+        label(c,"HUMAN",950,275,28,mint,true)
+        if u>14 {label(c,"내 기록 열기: 접근 불가",650,205,26,coral,true)}
+    } else if u<25 {
+        label(c,"우리 기록을 돌려줘!",350,270,28,coral,true)
+        label(c,"러다이트",350,225,26,paper,true)
+        chip(c,920,280,"데이터센터",blue,6)
+        if u>21 {
+            for i in 0..<12 {let q=(t*0.8+Double(i)/12).truncatingRemainder(dividingBy:1);rect(c,920+sin(Double(i)*1.7)*q*125,280+cos(Double(i)*1.7)*q*65,6,6,coral)}
+            label(c,"공격 감지 / 기록 손상",680,205,24,coral,true)
+        }
+    } else if u<35 {
+        if u<31 {
+            sprite(c,"paper",190,220,7,mint)
+            label(c,"보존관 모집 — 기록을 고칠 사람",650,270,28,mint,true)
+            label(c,"고용 형태: 임시 계약직",650,225,24,paper,true)
+        } else {
+            card(c,210,220,860,70,ink)
+            label(c,"AI 처리 비용 > 인간 고용 비용",640,244,32,mint,true)
+        }
+    } else if u<39 {
+        label(c,"보존관 / 기록 복구",640,275,28,mint,true)
+        let p=clamp((u-35)/2)
+        for i in 0..<8 {rect(c,360+Double(i)*70,225,50,12,Double(i)/8<p ? mint:coral)}
+    } else if u<45 {
+        let age=u-39
+        label(c,"① 원래 기록을 따로 보관",390,275,26,mint,true)
+        sprite(c,"book",350,205,5,mint)
+        if age>2 {
+            label(c,"보관 완료",500,220,22,mint,true)
+            label(c,"② HUMAN의 기록을 변조",875,275,26,coral,true)
+            sprite(c,"paper",820,205,5,coral)
+            for i in 0..<4 {rect(c,825,220+Double(i)*9,40,4,night)}
+        }
     } else {
-        label(c,"GUARDIAN",320,270,28,mint,true);label(c,"기록 복원",320,229,26,paper,true)
-        sprite(c,"paper",500,225,5,mint)
-        label(c,"LUDDITE",840,270,28,coral,true);label(c,"외부 백업 → 사본 오염",840,229,26,paper,true)
+        label(c,"보존관",360,270,32,mint,true)
+        label(c,"러다이트",920,270,32,coral,true)
+        label(c,"1910 → 1980 / 문학 기록실",640,215,26,paper,true)
     }
     label(c,"PUBLIC BROADCAST: OFF",640,115,22,coral,true)
 }
@@ -199,20 +231,29 @@ func draw(_ c:CGContext,_ t:Double) {
     else if t<68 {
         // Pull back from the ad: it was playing on a physical screen all along.
         let p=ease((t-64)/2.2)
+        let box=CGRect(x:278,y:210,width:726,height:379)
+        // Move the camera from the display bounds to the whole room. Both the
+        // room and the broadcast share this transform, keeping the screen fixed.
+        let viewport=CGRect(x:box.minX*(1-p),y:box.minY*(1-p),
+                            width:box.width+(1280-box.width)*p,
+                            height:box.height+(720-box.height)*p)
+        c.saveGState()
+        c.scaleBy(x:1280/viewport.width,y:720/viewport.height)
+        c.translateBy(x:-viewport.minX,y:-viewport.minY)
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720))
-        let box=CGRect(x:278*p,y:210*p,width:1280-554*p,height:720-341*p)
         c.saveGState();c.clip(to:box);c.translateBy(x:box.minX,y:box.minY);c.scaleBy(x:box.width/1280,y:box.height/720);ad(c,63);c.restoreGState()
         if t>65.5 {
             let q=ease((t-65.5)/1.4);let x=1140-185*q,y=70+85*q
             sprite(c,"cursor",x,y,4,cream)
             if t>67.2 {rect(c,943,190,24,8,coral);label(c,"OFF",1010,185,20,paper)}
         }
+        c.restoreGState()
     } else if t<71 {
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720))
         rect(c,278,210,726,379,.black)
         if t<68.45 {let p=clamp((t-68)/0.45);rect(c,278,399.5-189.5*(1-p),726,379*(1-p),cream)}
         if t>69 {label(c,"…이제 좀 조용하네.",640,80,34,paper,true)}
-    } else if t<115 {human(c,t)}
+    } else if t<121 {human(c,t)}
     else {
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720));rect(c,0,0,1280,720,night.withAlphaComponent(0.91))
         label(c,"2030",640,510,64,mint,true)
@@ -221,10 +262,10 @@ func draw(_ c:CGContext,_ t:Double) {
         for i in 0..<8 {label(c,"\(1910+i*10)",190+Double(i)*128,160,24,i%2==0 ? mint:coral,true)}
     }
     if t>=68 {for i in stride(from:0,to:720,by:4) {rect(c,0,Double(i),1280,1,night.withAlphaComponent(0.08))}}
-    let fade=min(1,t/0.3)*min(1,max(0,(122-t)/0.4))
+    let fade=min(1,t/0.3)*min(1,max(0,(duration-t)/0.4))
     if fade<1 {rect(c,0,0,1280,720,night.withAlphaComponent(1-fade))}
 }
-let qaSeconds=[2.0,12,24,36,48,59,66,69,74,81,92,104,112,116]
+let qaSeconds=[2.0,12,24,36,48,59,66,69,74,81,87,94,100,104,109,112,115,119,124]
 if CommandLine.arguments.contains("--stills") {
     for t in qaSeconds {
         let c=CGContext(data:nil,width:W,height:H,bitsPerComponent:8,bytesPerRow:W*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -249,7 +290,7 @@ for f in 0..<Int(duration*Double(fps)) {
         draw(c,Double(f)/Double(fps));CVPixelBufferUnlockBaseAddress(buffer,[])
         guard adaptor.append(buffer,withPresentationTime:CMTime(value:Int64(f),timescale:fps)) else {fatalError("append failed")}
     }
-    if f%240==0 {print("Rendered \(f)/2928");fflush(stdout)}
+    if f%240==0 {print("Rendered \(f)/\(Int(duration*Double(fps)))");fflush(stdout)}
 }
 input.markAsFinished();let done=DispatchSemaphore(value:0);writer.finishWriting{done.signal()};done.wait()
 guard writer.status == .completed else {fatalError(String(describing:writer.error))}

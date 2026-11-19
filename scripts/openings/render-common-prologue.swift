@@ -6,7 +6,8 @@ import CoreText
 import ImageIO
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/common-prologue-v1")
-let assets=out.appendingPathComponent("assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let assets=root.appendingPathComponent("assets/openings/common-prologue-v1")
 let W=1280,H=720,fps:Int32=24,duration=120.0
 for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     CTFontManagerRegisterFontsForURL(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(file)") as CFURL,.process,nil)
@@ -14,8 +15,8 @@ for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
 func load(_ url:URL)->CGImage {let s=CGImageSourceCreateWithURL(url as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
 let names=["01-city","02-office","03-owner","04-convergence","05-resistance","06-recruitment","07-corridor"]
 let art=names.map {load(assets.appendingPathComponent("\($0).png"))}
-let archive=load(root.appendingPathComponent("output/openings/luddite-v8/assets/archive-room.png"))
-let shelter=load(root.appendingPathComponent("output/openings/luddite-v8/assets/resistance-archive.png"))
+let archive=load(root.appendingPathComponent("assets/openings/luddite-v8/archive-room.png"))
+let shelter=load(root.appendingPathComponent("assets/openings/luddite-v8/resistance-archive.png"))
 let cyan=NSColor(calibratedRed:0.39,green:0.92,blue:0.9,alpha:1)
 let red=NSColor(calibratedRed:1,green:0.36,blue:0.34,alpha:1)
 let amber=NSColor(calibratedRed:1,green:0.77,blue:0.45,alpha:1)

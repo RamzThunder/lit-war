@@ -6,7 +6,8 @@ import ImageIO
 
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/luddite-v8")
-let assets=out.appendingPathComponent("assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let assets=root.appendingPathComponent("assets/openings/luddite-v8")
 let W=1280,H=720,fps:Int32=24,duration=79.0
 for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     let u=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(file)")

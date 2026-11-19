@@ -8,10 +8,10 @@ import CoreImage
 enum ExtractionScene {
 static let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 static let out=root.appendingPathComponent("output/openings/luddite-v9")
-static let shared=root.appendingPathComponent("output/openings/conveyor-motion-test-v1/assets")
-static let assets=root.appendingPathComponent("output/openings/record-extraction-test-v1/assets")
+static let shared=root.appendingPathComponent("assets/openings/conveyor-motion-test-v1")
+static let assets=root.appendingPathComponent("assets/openings/record-extraction-test-v1")
 static let W=1280,H=720,fps:Int32=24,duration=11.0
-static func load(_ name:String)->CGImage{let directory=name == "server-dark-plate.png" ? out.appendingPathComponent("assets"):(name == "blank-page.png" ? assets:shared);let s=CGImageSourceCreateWithURL(directory.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
+static func load(_ name:String)->CGImage{let directory=name == "server-dark-plate.png" ? root.appendingPathComponent("assets/openings/luddite-v9"):(name == "blank-page.png" ? assets:shared);let s=CGImageSourceCreateWithURL(directory.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
 static let plate=load("machine-clean-plate.png"),belt=load("belt-texture.png"),paper=load("manuscript-page.png")
 static let blank=load("blank-page.png"),darkPlate=load("server-dark-plate.png")
 static let ci=CIContext(options:[.cacheIntermediates:false])
@@ -156,7 +156,8 @@ static func draw(_ c:CGContext,_ t:Double) {
 }
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/luddite-v10")
-let assets=root.appendingPathComponent("output/openings/luddite-v8/assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let assets=root.appendingPathComponent("assets/openings/luddite-v8")
 let W=1280,H=720,fps:Int32=24,duration=79.0
 for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     let u=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(file)")
@@ -450,7 +451,7 @@ if CommandLine.arguments.contains("--stills") {
     }
     print("Preview frames ready");exit(0)
 }
-let final=URL(fileURLWithPath:"/private/tmp/luddite-v10-segment.mp4")
+let final=URL(fileURLWithPath:"/private/tmp/luddite-v10-render.mp4")
 try? FileManager.default.removeItem(at:final)
 let writer=try AVAssetWriter(outputURL:final,fileType:.mp4)
 let input=AVAssetWriterInput(mediaType:.video,outputSettings:[AVVideoCodecKey:AVVideoCodecType.h264,AVVideoWidthKey:W,AVVideoHeightKey:H,AVVideoCompressionPropertiesKey:[AVVideoAverageBitRateKey:4_000_000,AVVideoMaxKeyFrameIntervalKey:48]])
@@ -459,7 +460,7 @@ writer.add(input)
 guard writer.startWriting() else {fatalError("writer start: \(String(describing:writer.error))")}
 writer.startSession(atSourceTime:.zero)
 let snapshots:[Int]=[128,192,420,444,468,492,516,552,588,792,1800]
-for f in 0..<Int(11*Double(fps)) {
+for f in 0..<Int(duration*Double(fps)) {
     while !input.isReadyForMoreMediaData {
         if writer.status == .failed {fatalError("writer failed: \(String(describing:writer.error))")}
         Thread.sleep(forTimeInterval:0.002)
@@ -471,7 +472,7 @@ for f in 0..<Int(11*Double(fps)) {
         let buffer=b!
         CVPixelBufferLockBaseAddress(buffer,[])
         let c=CGContext(data:CVPixelBufferGetBaseAddress(buffer),width:W,height:H,bitsPerComponent:8,bytesPerRow:CVPixelBufferGetBytesPerRow(buffer),space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.noneSkipFirst.rawValue)!
-        draw(c,14+Double(f)/Double(fps))
+        draw(c,Double(f)/Double(fps))
         if CommandLine.arguments.contains("--qa") && snapshots.contains(f),let im=c.makeImage() {
             let u=out.appendingPathComponent("frame-\(f).png")
             let d=CGImageDestinationCreateWithURL(u as CFURL,"public.png" as CFString,1,nil)!
@@ -480,26 +481,15 @@ for f in 0..<Int(11*Double(fps)) {
         CVPixelBufferUnlockBaseAddress(buffer,[])
         guard adaptor.append(buffer,withPresentationTime:CMTime(value:Int64(f),timescale:fps)) else {fatalError("append failed")}
     }
-    if f%240==0 {print("Rendered segment \(f)/264");fflush(stdout)}
+    if f%240==0 {print("Rendered \(f)/\(Int(duration*Double(fps)))");fflush(stdout)}
 }
 input.markAsFinished();let done=DispatchSemaphore(value:0)
 writer.finishWriting{done.signal()};done.wait()
 guard writer.status == .completed else {fatalError("render: \(String(describing:writer.error))")}
-// Replace only the changed 14~25s section; all other shots come from v9 unchanged.
-let old=AVURLAsset(url:root.appendingPathComponent("output/openings/luddite-v9/luddite-v9-no-voice.mp4"))
-let patch=AVURLAsset(url:final)
-let joined=AVMutableComposition()
-let joinedTrack=joined.addMutableTrack(withMediaType:.video,preferredTrackID:kCMPersistentTrackID_Invalid)!
-func time(_ seconds:Double)->CMTime {CMTime(seconds:seconds,preferredTimescale:600)}
-try joinedTrack.insertTimeRange(CMTimeRange(start:.zero,duration:time(14)),of:old.tracks(withMediaType:.video)[0],at:.zero)
-try joinedTrack.insertTimeRange(CMTimeRange(start:.zero,duration:time(11)),of:patch.tracks(withMediaType:.video)[0],at:time(14))
-try joinedTrack.insertTimeRange(CMTimeRange(start:time(25),duration:time(54)),of:old.tracks(withMediaType:.video)[0],at:time(25))
+// Render the complete timeline without depending on an older MP4.
 let finishedURL=out.appendingPathComponent("luddite-v10-no-voice.mp4")
 try? FileManager.default.removeItem(at:finishedURL)
-let joinExport=AVAssetExportSession(asset:joined,presetName:AVAssetExportPresetHighestQuality)!
-joinExport.outputURL=finishedURL;joinExport.outputFileType = .mp4;joinExport.shouldOptimizeForNetworkUse=true
-let joinDone=DispatchSemaphore(value:0);joinExport.exportAsynchronously{joinDone.signal()};joinDone.wait()
-guard joinExport.status == .completed else {fatalError("join: \(String(describing:joinExport.error))")}
+try FileManager.default.copyItem(at:final,to:finishedURL)
 let result=AVURLAsset(url:finishedURL)
 print("DONE duration=\(CMTimeGetSeconds(result.duration)) video=\(result.tracks(withMediaType:.video).count) audio=\(result.tracks(withMediaType:.audio).count) \(finishedURL.path)")
 // Optional sound version: alert chimes only, no voice. Silent master is preserved.

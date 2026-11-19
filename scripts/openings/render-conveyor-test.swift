@@ -6,7 +6,8 @@ import ImageIO
 import AppKit
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/conveyor-motion-test-v1")
-let assets=out.appendingPathComponent("assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let assets=root.appendingPathComponent("assets/openings/conveyor-motion-test-v1")
 let W=1280,H=720,fps:Int32=24,duration=8.0
 func load(_ name:String)->CGImage{let s=CGImageSourceCreateWithURL(assets.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
 let plate=load("machine-clean-plate.png"),belt=load("belt-texture.png"),paper=load("manuscript-page.png")

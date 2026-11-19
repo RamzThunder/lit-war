@@ -7,8 +7,9 @@ import AppKit
 import CoreText
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/record-extraction-test-v2")
-let shared=root.appendingPathComponent("output/openings/conveyor-motion-test-v1/assets")
-let assets=root.appendingPathComponent("output/openings/record-extraction-test-v1/assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let shared=root.appendingPathComponent("assets/openings/conveyor-motion-test-v1")
+let assets=root.appendingPathComponent("assets/openings/record-extraction-test-v1")
 let W=1280,H=720,fps:Int32=24,duration=10.0
 func load(_ name:String)->CGImage{let directory=name == "blank-page.png" ? assets:shared;let s=CGImageSourceCreateWithURL(directory.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
 let plate=load("machine-clean-plate.png"),belt=load("belt-texture.png"),paper=load("manuscript-page.png")

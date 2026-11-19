@@ -8,10 +8,10 @@ import CoreImage
 enum ExtractionScene {
 static let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 static let out=root.appendingPathComponent("output/openings/luddite-v9")
-static let shared=root.appendingPathComponent("output/openings/conveyor-motion-test-v1/assets")
-static let assets=root.appendingPathComponent("output/openings/record-extraction-test-v1/assets")
+static let shared=root.appendingPathComponent("assets/openings/conveyor-motion-test-v1")
+static let assets=root.appendingPathComponent("assets/openings/record-extraction-test-v1")
 static let W=1280,H=720,fps:Int32=24,duration=11.0
-static func load(_ name:String)->CGImage{let directory=name == "server-dark-plate.png" ? out.appendingPathComponent("assets"):(name == "blank-page.png" ? assets:shared);let s=CGImageSourceCreateWithURL(directory.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
+static func load(_ name:String)->CGImage{let directory=name == "server-dark-plate.png" ? root.appendingPathComponent("assets/openings/luddite-v9"):(name == "blank-page.png" ? assets:shared);let s=CGImageSourceCreateWithURL(directory.appendingPathComponent(name) as CFURL,nil)!;return CGImageSourceCreateImageAtIndex(s,0,nil)!}
 static let plate=load("machine-clean-plate.png"),belt=load("belt-texture.png"),paper=load("manuscript-page.png")
 static let blank=load("blank-page.png"),darkPlate=load("server-dark-plate.png")
 static let ci=CIContext(options:[.cacheIntermediates:false])
@@ -150,7 +150,8 @@ static func draw(_ c:CGContext,_ t:Double) {
 }
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=root.appendingPathComponent("output/openings/luddite-v9")
-let assets=root.appendingPathComponent("output/openings/luddite-v8/assets")
+try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+let assets=root.appendingPathComponent("assets/openings/luddite-v8")
 let W=1280,H=720,fps:Int32=24,duration=79.0
 for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     let u=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(file)")
