@@ -1,0 +1,11 @@
+{
+  "tool": "built-in image_gen",
+  "prompts": {
+    "bright": "Use case: stylized-concept. Asset: 16:9 pixel art background for a cheerful but secretly sinister AI corporation propaganda film inside a Korean classroom dystopian game. Genuine polished 16-bit pixel art with carefully clustered square pixels, limited palette, no vector look, no smooth painting, no blur, no gradients. A delightful utopian city park in mint, butter yellow, coral and sky blue, symmetrical distant futuristic automated office towers and server tower, flower beds, tiny delivery carts on tracks, bright clouds. View from a gently elevated side-on game camera. Wide clean pale blue sky in the upper half for animated typography to be added later; park detail along bottom third. No people, no faces, no humanoid robots, no eyes, no statues, no readable text, no letters, no UI, no logos, no watermark. Charming meticulously detailed actual game background, faux corporate optimism, crisp large pixel clusters. 16:9 full bleed.",
+    "room": "Use case: stylized-concept. Asset: 16:9 pixel art background for the moment a human turns off a cheerful AI propaganda film. Genuine polished 16-bit dystopian adventure game pixel art, carefully clustered square pixels, limited palette, crisp pixels, no vector look, no painterly gradients. Dark small underground human archive room, books and paper folders on shelves at both sides, cables, amber desk lamp at left, red scarf draped on a chair at right. Center composition contains a large old flat rectangular dark charcoal monitor facing the viewer absolutely straight-on, its blank BLACK rectangular screen is unobstructed and occupies approximately x=20% to80%, y=18% to78% of the image. Thin monitor bezel and a physical red power switch below the right screen corner. The display is entirely black with no reflections and no writing, for later compositing video within. No people or body parts at all, no faces in artwork, photos, posters, reflections or statues. No text, no watermark. Warm paper archive surrounds cool dead screen. Detailed intimate rebel game atmosphere; not a generic classroom, no holograms. Full bleed 16:9."
+  },
+  "assets": {
+    "bright-city.png": "exec-fafa84e2-805d-45e5-83bc-a711d485aeae",
+    "human-room.png": "exec-071bbb16-4624-47e2-8326-b10d87684795"
+  }
+}
