@@ -189,3 +189,7 @@ npm run deploy
 기존 `src/common.js`, `src/game.html`, `src/tv.html`, `build.py`, `dist/`는 보존했습니다.
 이전 Firebase 기반 프로젝트이며 새 진입점은 참조하지 않습니다. `python3 build.py`는
 이전 버전용 명령입니다. 새 게임 출력은 `build/`입니다.
+
+## 오프닝 영상 편집
+
+[최신 3편 통합 콘티와 대사](docs/영상-3편-콘티와-대사.md)가 유일한 편집 원본입니다. 대사는 렌더러가 직접 읽으며, 상세 연출·시간 변경은 같은 문서에 작성한 뒤 코드에 반영합니다. `docs/archive/openings/`는 보관 전용입니다.

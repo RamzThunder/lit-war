@@ -6,8 +6,34 @@ import CoreText
 import ImageIO
 
 // All animation is deterministic. Art is raster pixel art; text and sprites stay crisp.
+// BEGIN SHARED STORYBOARD READER — keep identical across the three current renderers.
+let storyboardURL=URL(fileURLWithPath:ProcessInfo.processInfo.environment["OPENING_STORYBOARD"] ?? "docs/영상-3편-콘티와-대사.md")
+let storyboardLines=try String(contentsOf:storyboardURL,encoding:.utf8).components(separatedBy:.newlines)
+let storyboardPattern=try NSRegularExpression(pattern: #"^- \*\*([CGL][0-9]{3})\*\*: (.+)$"#)
+var storyboardText:[String:String]=[:]
+for line in storyboardLines {
+    let range=NSRange(line.startIndex...,in:line)
+    if let match=storyboardPattern.firstMatch(in:line,range:range),
+       let idRange=Range(match.range(at:1),in:line),let textRange=Range(match.range(at:2),in:line) {
+        let id=String(line[idRange]),value=String(line[textRange])
+        precondition(storyboardText[id]==nil,"Duplicate storyboard ID: \(id)")
+        precondition(!value.trimmingCharacters(in:.whitespaces).isEmpty,"Empty storyboard text: \(id)")
+        storyboardText[id]=value
+    }
+}
+func scriptText(_ id:String)->String {
+    guard let value=storyboardText[id] else {fatalError("Missing storyboard text: \(id). Edit docs/영상-3편-콘티와-대사.md")}
+    return value
+}
+// END SHARED STORYBOARD READER
+let requiredScriptIDs=["G001", "G002", "G003", "G004", "G005", "G006", "G007", "G008", "G009", "G010", "G011", "G012", "G013", "G014", "G015", "G016", "G017", "G018", "G019", "G020", "G021", "G022", "G023", "G024", "G025", "G026", "G027", "G028", "G029", "G030", "G031", "G032", "G033", "G034", "G035", "G036", "G037", "G038", "G039", "G040", "G041", "G042", "G043", "G044", "G045", "G046", "G047", "G048", "G049", "G050", "G051", "G052", "G053", "G054", "G055", "G056", "G057", "G058", "G059", "G060"]
+for id in requiredScriptIDs {_ = scriptText(id)}
+if CommandLine.arguments.contains("--dump-script") {
+    let data=try JSONSerialization.data(withJSONObject:Dictionary(uniqueKeysWithValues:requiredScriptIDs.map{($0,scriptText($0))}),options:[.sortedKeys])
+    print(String(data:data,encoding:.utf8)!);exit(0)
+}
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
-let out=root.appendingPathComponent("output/openings/guardian-v1")
+let out=URL(fileURLWithPath:ProcessInfo.processInfo.environment["OPENING_OUTPUT_DIR"] ?? root.appendingPathComponent("output/openings/guardian-v1").path)
 try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
 let W=1280,H=720,fps:Int32=24,duration=83.0
 for name in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
@@ -23,11 +49,31 @@ let ink=color(0x173D4A),cream=color(0xFFF8DC),mint=color(0xA8E9CF),coral=color(0
 func clamp(_ x:Double)->Double {min(1,max(0,x))}
 func ease(_ x:Double)->Double {let p=clamp(x);return 1-pow(1-p,3)}
 func rect(_ c:CGContext,_ x:Double,_ y:Double,_ w:Double,_ h:Double,_ col:NSColor) {c.setFillColor(col.cgColor);c.fill(CGRect(x:round(x),y:round(y),width:round(w),height:round(h)))}
-func label(_ c:CGContext,_ s:String,_ x:Double,_ y:Double,_ size:Double=36,_ col:NSColor=ink,_ centered:Bool=false) {
+// Wrap edited prose at measured glyph boundaries without changing the source copy.
+func copyLines(_ value:String,_ size:Double,_ width:Double)->[String] {
+    let font=CTFontCreateWithName((size>=32 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
+    let attr=NSAttributedString(string:value,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font])
+    let setter=CTTypesetterCreateWithAttributedString(attr)
+    let text=value as NSString
+    var offset=0,result:[String]=[]
+    while offset<text.length {
+        let count=CTTypesetterSuggestLineBreak(setter,offset,width)
+        precondition(count>0,"Cannot fit dialogue")
+        result.append(text.substring(with:NSRange(location:offset,length:count)).trimmingCharacters(in:.whitespaces))
+        offset+=count
+    }
+    return result
+}
+func copyWidth(_ value:String,_ size:Double)->Double {
+    let font=CTFontCreateWithName((size>=32 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
+    let line=CTLineCreateWithAttributedString(NSAttributedString(string:value,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font]))
+    return CTLineGetTypographicBounds(line,nil,nil,nil)
+}
+func label(_ c:CGContext,_ s:String,_ x:Double,_ y:Double,_ size:Double=36,_ col:NSColor=ink,_ centered:Bool=false,_ maxWidth:Double=1200) {
     let font=CTFontCreateWithName((size>=32 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
     let line=CTLineCreateWithAttributedString(NSAttributedString(string:s,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.foregroundColor:col]))
     let w=CTLineGetTypographicBounds(line,nil,nil,nil)
-    precondition(w<1200,"Text overflow \(s): \(w)")
+    precondition(w<maxWidth,"Text overflow \(s): \(w)")
     c.setShouldAntialias(false);c.setShouldSmoothFonts(false);c.textMatrix = .identity
     c.textPosition=CGPoint(x:round(centered ? x-w/2:x),y:round(y));CTLineDraw(line,c)
 }
@@ -58,16 +104,21 @@ func chip(_ c:CGContext,_ x:Double,_ y:Double,_ title:String,_ tint:NSColor=mint
 }
 func progress(_ c:CGContext,_ t:Double) {
     rect(c,48,666,1184,4,ink.withAlphaComponent(0.15));rect(c,48,666,1184*clamp(t/64),4,coral)
-    label(c,"HUMAN / BETTER TOMORROW",50,687,18,ink);label(c,"인류 행복 증진 홍보실",1090,687,18,ink,true)
+    label(c,scriptText("G001"),50,687,18,ink);label(c,scriptText("G002"),1090,687,18,ink,true)
 }
 func ticker(_ c:CGContext,_ s:String,_ t:Double) {
-    rect(c,0,0,1280,43,ink);let x=1280-(t*65).truncatingRemainder(dividingBy:2200)
-    label(c,s,x,12,22,cream);label(c,s,x-2200,12,22,cream)
+    let cycle=max(1280,copyWidth(s,22)+180)
+    rect(c,0,0,1280,43,ink)
+    let x=1280-(t*65).truncatingRemainder(dividingBy:cycle)
+    label(c,s,x,12,22,cream,false,Double.greatestFiniteMagnitude)
+    label(c,s,x-cycle,12,22,cream,false,Double.greatestFiniteMagnitude)
 }
 func heading(_ c:CGContext,_ year:String,_ title:String) {
     card(c,48,574,172,62,yellow);label(c,year,134,590,38,ink,true);label(c,title,253,590,40,ink)
 }
-func subtitle(_ c:CGContext,_ lines:[String],_ col:NSColor=ink,_ dark:Bool=false) {
+func subtitle(_ c:CGContext,_ sourceLines:[String],_ col:NSColor=ink,_ dark:Bool=false) {
+    let lines=sourceLines.flatMap{copyLines($0,34,1124)}
+    precondition(lines.count<=3,"Subtitle needs a longer scene or a different layout")
     let y=dark ? 55.0:65.0
     if dark {rect(c,48,y-15,1184,Double(lines.count)*46+26,night.withAlphaComponent(0.96))}
     else {card(c,48,y-15,1184,Double(lines.count)*46+26,cream)}
@@ -111,16 +162,16 @@ func interruptedSignal(_ c:CGContext,_ u:Double) {
         rect(c,0,0,1280,720,night.withAlphaComponent(0.45))
         noise(c,u,0.65)
         rect(c,190,304,900,110,night.withAlphaComponent(0.95))
-        label(c,"신호 간섭 감지",640,344,40,paper,true)
+        label(c,scriptText("G003"),640,344,40,paper,true)
     } else if u<3.8 {
         rect(c,0,0,1280,720,color(0x07141D))
         noise(c,u,0.35)
         rect(c,120,210,1040,350,night.withAlphaComponent(0.97))
         rect(c,120,552,1040,5,coral)
-        label(c,"외부 신호 수신 / HUMAN 채널 연결 끊김",640,506,24,coral,true)
-        label(c,"그 기록을 복원하면,",640,405,48,paper,true)
-        label(c,"누가 갖게 되지?",640,315,54,coral,true)
-        label(c,"UNKNOWN SOURCE",640,118,22,paper,true)
+        label(c,scriptText("G004"),640,506,24,coral,true)
+        label(c,scriptText("G005"),640,405,48,paper,true)
+        label(c,scriptText("G006"),640,315,54,coral,true)
+        label(c,scriptText("G007"),640,118,22,paper,true)
         // Noise stays at the edges so the brief question remains readable.
         for i in 0..<8 {
             let y=Double((i*97+Int(u*12)*13)%190)
@@ -133,84 +184,84 @@ func interruptedSignal(_ c:CGContext,_ u:Double) {
         for i in 0..<7 {rect(c,Double(i)*1280/7,170,1280/7+1,550,bars[i].withAlphaComponent(0.8))}
         for i in 0..<16 {rect(c,Double(i)*80,0,80,170,color(i%2==0 ? 0xEEEEDE:0x172D39))}
         card(c,240,260,800,220,cream)
-        label(c,"HUMAN",640,414,32,ink,true)
-        label(c,"화면 조정 중",640,337,52,ink,true)
-        label(c,"잠시만 기다려 주세요",640,286,24,ink,true)
+        label(c,scriptText("G008"),640,414,32,ink,true)
+        label(c,scriptText("G009"),640,337,52,ink,true)
+        label(c,scriptText("G010"),640,286,24,ink,true)
     } else {
         picture(c,library,CGRect(x:0,y:0,width:1280,height:720))
         rect(c,0,0,1280,720,cream.withAlphaComponent(0.36))
         card(c,100,220,1080,350,mint)
-        label(c,"다시 안내를 시작할게요!",640,400,44,ink,true)
-        label(c,"여러분의 멋진 출발을 응원합니다!",640,315,32,ink,true)
+        label(c,scriptText("G011"),640,400,44,ink,true)
+        label(c,scriptText("G012"),640,315,32,ink,true)
     }
 }
 func draw(_ c:CGContext,_ t:Double) {
     picture(c,library,CGRect(x:0,y:0,width:1280,height:720))
     rect(c,0,0,1280,720,cream.withAlphaComponent(0.36))
-    label(c,"HUMAN / 당신과 함께 만드는 더 나은 내일",50,687,18,ink)
+    label(c,scriptText("G013"),50,687,18,ink)
     rect(c,48,666,1184,4,ink.withAlphaComponent(0.15));rect(c,48,666,1184*t/duration,4,coral)
     if t<8 {
         card(c,180,230,920,330,cream)
-        label(c,"축하합니다!",640,463,68,ink,true)
-        label(c,"당신의 새로운 무대가 열립니다",640,380,40,ink,true)
-        label(c,"HUMAN 인류유산 보존 프로젝트",640,293,28,ink,true)
+        label(c,scriptText("G014"),640,463,68,ink,true)
+        label(c,scriptText("G015"),640,380,40,ink,true)
+        label(c,scriptText("G016"),640,293,28,ink,true)
         confetti(c,t)
-        subtitle(c,["당신의 경험이, 모두의 내일을 밝힙니다!"])
+        subtitle(c,[scriptText("G017")])
     } else if t<18 {
-        let u=t-8;banner(c,"당신이 읽어 온 이야기, 기억하시나요?")
+        let u=t-8;banner(c,scriptText("G018"))
         for i in 0..<3 {
             pop(c,85+Double(i)*410,255,age:u-Double(i)*0.7) {
                 card(c,0,0,290,240,[mint,blue,yellow][i])
                 sprite(c,"book",100,95,10,[mint,blue,yellow][i])
-                label(c,["마음을 움직인 글","함께 나눈 생각","오래 남은 기억"][i],145,40,26,ink,true)
+                label(c,[scriptText("G019"),scriptText("G020"),scriptText("G021")][i],145,40,26,ink,true)
             }
         }
-        subtitle(c,u<5 ? ["글 속의 마음을 헤아리고, 이야기를 나누는 힘."]:["그 소중한 경험을, 이제 모두를 위해 나눠 주세요!"])
+        subtitle(c,u<5 ? [scriptText("G022")]:[scriptText("G023")])
     } else if t<28 {
-        let u=t-18;banner(c,"우리의 이야기에, 당신의 손길을!")
+        let u=t-18;banner(c,scriptText("G024"))
         card(c,180,235,920,280,cream)
         for i in 0..<6 {
             let x=260+Double(i)*135
             sprite(c,"paper",x,340+sin(u+Double(i))*8,7,i%3==0 ? coral:mint)
-            if i%3==0 {label(c,"?",x+35,292,42,coral,true)}
+            if i%3==0 {label(c,scriptText("G025"),x+35,292,42,coral,true)}
         }
-        label(c,"소중한 문학 기록 / 복구를 기다리고 있어요",640,252,28,ink,true)
-        subtitle(c,u<5 ? ["자칭 ‘러다이트’라는 테러 집단이,","소중한 문학 기록을 훼손했어요."]:["괜찮아요. 여러분과 함께라면 다시 이어 갈 수 있어요!"])
+        label(c,scriptText("G026"),640,252,28,ink,true)
+        subtitle(c,u<5 ? [scriptText("G027"),scriptText("G028")]:[scriptText("G029")])
     } else if t<38 {
-        let u=t-28;banner(c,"인류의 이야기를 잇는 특별한 이름")
+        let u=t-28;banner(c,scriptText("G030"))
         card(c,180,230,920,285,mint)
-        label(c,"인류유산 보존관",640,402,64,ink,true)
-        label(c,"G U A R D I A N",640,335,30,ink,true)
-        label(c,"당신의 꼼꼼함이, 모두의 기억을 지킵니다",640,267,28,ink,true)
+        label(c,scriptText("G031"),640,402,64,ink,true)
+        label(c,scriptText("G032"),640,335,30,ink,true)
+        label(c,scriptText("G033"),640,267,28,ink,true)
         confetti(c,u);star(c,110,390,9,coral);star(c,1090,315,7,yellow)
-        subtitle(c,["당신을 인류유산 보존관으로 초대합니다!"])
+        subtitle(c,[scriptText("G034")])
     } else if t<51 {
-        let u=t-38;banner(c,"하나! 읽고, 찾고, 기록을 완성해요")
+        let u=t-38;banner(c,scriptText("G035"))
         card(c,75,230,540,290,cream);card(c,665,230,540,290,blue)
-        label(c,"복구할 기록",345,472,28,ink,true)
-        label(c,"동백꽃",345,406,44,ink,true)
-        label(c,u>5 ? "작가  김유정":"작가  ───",115,337,30,ink)
-        label(c,u>8 ? "발표  1936년":"발표  ───",115,280,30,ink)
-        label(c,"자료에서 힌트를 찾아요",935,472,28,ink,true)
-        label(c,"김유정의 소설 「동백꽃」",935,390,28,ink,true)
-        label(c,"발표 연도: 1936년",935,329,28,ink,true)
-        if u>9 {star(c,537,285,5,coral);label(c,"복구 완료!",935,259,30,ink,true)}
-        subtitle(c,u<5 ? ["작품과 작가, 시대를 천천히 살펴보세요."]:["자료를 읽고 빈칸을 채우면, 기록이 다시 살아나요!"])
+        label(c,scriptText("G036"),345,472,28,ink,true)
+        label(c,scriptText("G037"),345,406,44,ink,true)
+        label(c,u>5 ? scriptText("G038"):scriptText("G039"),115,337,30,ink)
+        label(c,u>8 ? scriptText("G040"):scriptText("G041"),115,280,30,ink)
+        label(c,scriptText("G042"),935,472,28,ink,true)
+        label(c,scriptText("G043"),935,390,28,ink,true)
+        label(c,scriptText("G044"),935,329,28,ink,true)
+        if u>9 {star(c,537,285,5,coral);label(c,scriptText("G045"),935,259,30,ink,true)}
+        subtitle(c,u<5 ? [scriptText("G046")]:[scriptText("G047")])
     } else if t<62 {
-        let u=t-51;banner(c,"둘! 바뀐 내용을 바로잡아요")
+        let u=t-51;banner(c,scriptText("G048"))
         card(c,280,232,720,285,u<4 ? cream:mint)
-        label(c,"동백꽃",640,435,48,ink,true)
+        label(c,scriptText("G037"),640,435,48,ink,true)
         if u<4 {
-            label(c,"변조됨 / 내용을 확인해 주세요",640,365,30,coral,true)
+            label(c,scriptText("G049"),640,365,30,coral,true)
             for i in 0..<4 {rect(c,410+Double(i%2)*35,270+Double(i)*17,440-Double(i)*48,8,coral)}
         } else {
-            label(c,"김유정 · 1936년",640,365,34,ink,true)
-            label(c,"정화 완료!",640,285,38,ink,true)
+            label(c,scriptText("G050"),640,365,34,ink,true)
+            label(c,scriptText("G051"),640,285,38,ink,true)
             star(c,330,305,6,yellow);star(c,895,400,5,coral)
         }
-        subtitle(c,u<4 ? ["누군가 기록을 바꿔 놓았다면, 바른 내용을 찾아주세요."]:["틀린 정보를 바로잡는 일, 우리는 ‘정화’라고 불러요!"])
+        subtitle(c,u<4 ? [scriptText("G052")]:[scriptText("G053")])
     } else if t<69 {
-        let u=t-62;banner(c,"당신이 지킨 한 줄, 모두가 나눌 이야기")
+        let u=t-62;banner(c,scriptText("G054"))
         for i in 0..<8 {
             let active=u>Double(i)*0.45
             let x=70+Double(i)*151
@@ -218,22 +269,34 @@ func draw(_ c:CGContext,_ t:Double) {
             sprite(c,"book",x+38,365,5,active ? yellow:blue)
             label(c,"\(1910+i*10)",x+62,337,24,ink,true)
         }
-        label(c,"1910~1980년대 문학 기록실",640,252,32,ink,true)
-        subtitle(c,["그 시대 사람들의 생각과 마음을, 내일로 이어 주세요!"])
+        label(c,scriptText("G055"),640,252,32,ink,true)
+        subtitle(c,[scriptText("G056")])
     } else if t<77 {
         interruptedSignal(c,t-69)
     } else {
         let u=t-77
         card(c,150,238,980,320,yellow)
-        label(c,"여러분의 활약을 기대합니다!",640,460,48,ink,true)
-        label(c,"인류유산 보존관",640,375,58,ink,true)
-        label(c,"HUMAN과 함께, 이야기는 계속됩니다",640,298,30,ink,true)
+        label(c,scriptText("G057"),640,460,48,ink,true)
+        label(c,scriptText("G031"),640,375,58,ink,true)
+        label(c,scriptText("G058"),640,298,30,ink,true)
         confetti(c,u)
-        subtitle(c,["준비되셨나요? 문학 기록실에서 만나요!"])
+        subtitle(c,[scriptText("G059")])
     }
-    if t<69 || t>=77 {ticker(c,"당신의 경험에 박수를!     /     우리의 이야기를 다음 세대로!     /     HUMAN 인류유산 보존 프로젝트",t)}
+    if t<69 || t>=77 {ticker(c,scriptText("G060"),t)}
     let fade=min(1,t/0.35)*min(1,max(0,(duration-t)/0.5))
     if fade<1 {rect(c,0,0,1280,720,cream.withAlphaComponent(1-fade))}
+}
+// A single real rendered frame, without touching the existing movie.
+if let index=CommandLine.arguments.firstIndex(of:"--preview-at") {
+    precondition(index+1<CommandLine.arguments.count,"Missing preview time")
+    let second=Double(CommandLine.arguments[index+1])!
+    precondition(second>=0 && second<duration,"Preview time outside film")
+    let context=CGContext(data:nil,width:W,height:H,bitsPerComponent:8,bytesPerRow:W*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+    draw(context,second)
+    let target=CGImageDestinationCreateWithURL(out.appendingPathComponent("preview.png") as CFURL,"public.png" as CFString,1,nil)!
+    CGImageDestinationAddImage(target,context.makeImage()!,nil)
+    precondition(CGImageDestinationFinalize(target),"Preview write failed")
+    print("Preview ready");exit(0)
 }
 if CommandLine.arguments.contains("--stills") {
     for t in [21.0,73.1,74.0,75.0,76.5,79.0] {

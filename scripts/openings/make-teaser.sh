@@ -12,7 +12,7 @@ SRC=output/openings/common-propaganda-v3/common-propaganda-v3-no-voice.mp4
 OUT=${1:-output/openings/common-propaganda-v3/teaser}
 mkdir -p "$OUT"
 
-# 잘라 쓸 구간(초): 시작 끝 — 콘티는 docs/OPENINGS.md 참고
+# 잘라 쓸 구간(초): 시작 끝 — 콘티는 docs/영상-3편-콘티와-대사.md 참고
 #  1 HUMAN 축하 / 2 2024 채팅창 / 3 AGI가 하나로(HUMAN) / 4 노동에서 해방
 #  5 광고 전원 끄기 / 6 보존관 복구·러다이트 원본 보관과 변조 / 7 제목
 SEGS="0.5 3.5

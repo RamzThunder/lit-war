@@ -2,11 +2,37 @@ import AppKit
 import AVFoundation
 import ImageIO
 import CoreText
+// BEGIN SHARED STORYBOARD READER — keep identical across the three current renderers.
+let storyboardURL=URL(fileURLWithPath:ProcessInfo.processInfo.environment["OPENING_STORYBOARD"] ?? "docs/영상-3편-콘티와-대사.md")
+let storyboardLines=try String(contentsOf:storyboardURL,encoding:.utf8).components(separatedBy:.newlines)
+let storyboardPattern=try NSRegularExpression(pattern: #"^- \*\*([CGL][0-9]{3})\*\*: (.+)$"#)
+var storyboardText:[String:String]=[:]
+for line in storyboardLines {
+    let range=NSRange(line.startIndex...,in:line)
+    if let match=storyboardPattern.firstMatch(in:line,range:range),
+       let idRange=Range(match.range(at:1),in:line),let textRange=Range(match.range(at:2),in:line) {
+        let id=String(line[idRange]),value=String(line[textRange])
+        precondition(storyboardText[id]==nil,"Duplicate storyboard ID: \(id)")
+        precondition(!value.trimmingCharacters(in:.whitespaces).isEmpty,"Empty storyboard text: \(id)")
+        storyboardText[id]=value
+    }
+}
+func scriptText(_ id:String)->String {
+    guard let value=storyboardText[id] else {fatalError("Missing storyboard text: \(id). Edit docs/영상-3편-콘티와-대사.md")}
+    return value
+}
+// END SHARED STORYBOARD READER
+let requiredScriptIDs=["L001", "L002", "L003", "L004", "L005", "L006", "L007", "L008", "L009", "L010", "L011", "L012", "L013", "L014", "L015", "L016", "L017", "L018", "L019", "L020", "L021", "L022", "L023", "L024", "L025", "L026", "L027", "L028", "L029", "L030", "L031", "L032", "L033", "L034", "L035", "L036", "L037", "L038", "L039", "L040", "L041", "L042", "L043", "L044", "L045", "L046", "L047", "L048", "L049", "L050", "L051", "L052", "L053", "L054", "L055", "L056", "L057", "L058", "L059", "L060", "L061", "L062", "L063"]
+for id in requiredScriptIDs {_ = scriptText(id)}
+if CommandLine.arguments.contains("--dump-script") {
+    let data=try JSONSerialization.data(withJSONObject:Dictionary(uniqueKeysWithValues:requiredScriptIDs.map{($0,scriptText($0))}),options:[.sortedKeys])
+    print(String(data:data,encoding:.utf8)!);exit(0)
+}
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let source = root.appendingPathComponent("assets/openings/luddite-pixel-v12/record-processing-room.png")
 let art = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(source as CFURL,nil)!,0,nil)!
 let W=1280,H=720,fps:Int32=24,duration=79.0
-let out=root.appendingPathComponent("output/openings/luddite-pixel-v12")
+let out=URL(fileURLWithPath:ProcessInfo.processInfo.environment["OPENING_OUTPUT_DIR"] ?? root.appendingPathComponent("output/openings/luddite-pixel-v12").path)
 try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
 for file in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     let u=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(file)")
@@ -21,6 +47,7 @@ let archives = readArt("luddite-pixel-v12/two-archives.png")
 let half = archives.width / 2
 let room = archives.cropping(to:CGRect(x:0,y:0,width:half,height:archives.height))!
 let shelter = archives.cropping(to:CGRect(x:half,y:0,width:half,height:archives.height))!
+let assignmentLibrary = readArt("guardian-v1/guardian-library.png")
 let terminal = readArt("common-propaganda-v3/human-room.png")
 let cyan=NSColor(calibratedRed:0.38,green:0.91,blue:0.86,alpha:1)
 let red=NSColor(calibratedRed:1,green:0.35,blue:0.35,alpha:1)
@@ -28,6 +55,26 @@ let amber=NSColor(calibratedRed:1,green:0.76,blue:0.43,alpha:1)
 let white=NSColor(calibratedWhite:0.95,alpha:1)
 func fill(_ c:CGContext,_ x:Double,_ y:Double,_ w:Double,_ h:Double,_ col:NSColor) {
     c.setFillColor(col.cgColor);c.fill(CGRect(x:x,y:y,width:w,height:h))
+}
+// Wrap edited prose at measured glyph boundaries without changing the source copy.
+func copyLines(_ value:String,_ size:Double,_ width:Double)->[String] {
+    let font=CTFontCreateWithName((size>=32 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
+    let attr=NSAttributedString(string:value,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font])
+    let setter=CTTypesetterCreateWithAttributedString(attr)
+    let text=value as NSString
+    var offset=0,result:[String]=[]
+    while offset<text.length {
+        let count=CTTypesetterSuggestLineBreak(setter,offset,width)
+        precondition(count>0,"Cannot fit dialogue")
+        result.append(text.substring(with:NSRange(location:offset,length:count)).trimmingCharacters(in:.whitespaces))
+        offset+=count
+    }
+    return result
+}
+func copyWidth(_ value:String,_ size:Double)->Double {
+    let font=CTFontCreateWithName((size>=32 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
+    let line=CTLineCreateWithAttributedString(NSAttributedString(string:value,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font]))
+    return CTLineGetTypographicBounds(line,nil,nil,nil)
 }
 func text(_ c:CGContext,_ s:String,_ x:Double,_ y:Double,_ size:Double=33,_ col:NSColor=white,_ center:Bool=false) {
     let font=CTFontCreateWithName((size>=33 ? "Galmuri11-Bold":"Galmuri11") as CFString,size,nil)
@@ -42,10 +89,13 @@ func frame(_ c:CGContext,_ x:Double,_ y:Double,_ w:Double,_ h:Double,_ col:NSCol
     fill(c,x,y,w,h,NSColor(calibratedWhite:0.015,alpha:0.93))
     fill(c,x,y,w,2,col);fill(c,x,y+h-2,w,2,col);fill(c,x,y,2,h,col);fill(c,x+w-2,y,2,h,col)
 }
-func message(_ c:CGContext,_ lines:[String],_ speaker:String="외부 접선자",_ col:NSColor=cyan) {
-    frame(c,60,64,1160,150,col.withAlphaComponent(0.6))
-    text(c,speaker,85,180,22,col)
-    for (i,line) in lines.enumerated(){text(c,line,85,132-Double(i)*43,33)}
+func message(_ c:CGContext,_ sourceLines:[String],_ speaker:String=scriptText("L001"),_ col:NSColor=cyan) {
+    let lines=sourceLines.flatMap{copyLines($0,33,1110)}
+    precondition(lines.count<=3,"Dialogue needs a longer scene or a different layout")
+    let extra=Double(max(0,lines.count-2))*43
+    frame(c,60,64,1160,150+extra,col.withAlphaComponent(0.6))
+    text(c,speaker,85,180+extra,22,col)
+    for (i,line) in lines.enumerated(){text(c,line,85,132+extra-Double(i)*43,33)}
 }
 func background(_ c:CGContext,_ image:CGImage,_ t:Double,_ shade:Double=0.45) {
     let z=1.0+0.018*sin(t*0.035)
@@ -84,19 +134,19 @@ func paperRecord(_ c:CGContext,_ x:Double,_ y:Double,_ status:String) {
     fill(c,x,y,390,174,paper)
     fill(c,x+15,y+16,3,140,ink.withAlphaComponent(0.25))
     text(c,status,x+30,y+140,22,ink)
-    text(c,"동백꽃",x+30,y+89,33,ink)
-    text(c,"김유정  /  1936",x+30,y+47,22,ink)
+    text(c,scriptText("L002"),x+30,y+89,33,ink)
+    text(c,scriptText("L003"),x+30,y+47,22,ink)
     for k in 0..<3 {fill(c,x+220,y+40+Double(k)*9,115-Double(k)*17,1,ink.withAlphaComponent(0.25))}
 }
-func record(_ c:CGContext,_ x:Double,_ y:Double,_ title:String="동백꽃",_ status:String="원본",_ col:NSColor=cyan,_ corrupted:Bool=false) {
+func record(_ c:CGContext,_ x:Double,_ y:Double,_ title:String=scriptText("L002"),_ status:String=scriptText("L004"),_ col:NSColor=cyan,_ corrupted:Bool=false) {
     frame(c,x,y,390,196,col)
     text(c,status,x+20,y+155,22,col)
     text(c,title,x+20,y+101,33)
-    text(c,"김유정  /  1936",x+20,y+58,22)
+    text(c,scriptText("L003"),x+20,y+58,22)
     for i in 0..<3 {fill(c,x+20,y+22+Double(i)*7,Double(205-i*30),2,col.withAlphaComponent(0.35))}
     if corrupted {
         fill(c,x+16,y+90,355,31,NSColor(calibratedWhite:0.01,alpha:1))
-        text(c,"[기록 데이터 변조됨]",x+20,y+96,22,red)
+        text(c,scriptText("L005"),x+20,y+96,22,red)
     }
 }
 func link(_ c:CGContext,_ p:Double,_ col:NSColor=cyan,_ reverse:Bool=false) {
@@ -120,14 +170,15 @@ func staticNoise(_ c:CGContext,_ t:Double,_ strength:Double) {
 }
 let sceneTimes:[(Double,String)]=[(0,"01-normal"),(4,"02-contact"),(10,"03-memory"),(21,"04-backup"),(33,"05-contaminate"),(45,"06-guardian"),(57,"07-read"),(65,"08-main-line"),(73,"09-end")]
 func normalTerminal(_ c:CGContext,_ t:Double) {
-    fill(c,0,0,1280,720,NSColor(calibratedRed:0.015,green:0.04,blue:0.055,alpha:1))
-    text(c,"HUMAN ARCHIVE",640,490,44,white,true)
-    text(c,"기록 보관 시스템",640,438,22,cyan,true)
-    text(c,"사용자 확인 완료. 기록실을 배정합니다.",640,343,33,white,true)
+    background(c,assignmentLibrary,t,0.19)
+    frame(c,220,185,840,385,cyan)
+    text(c,scriptText("L006"),640,490,44,white,true)
+    text(c,scriptText("L007"),640,438,22,cyan,true)
+    text(c,scriptText("L008"),640,343,33,white,true)
     let p=min(0.87,t/3*0.87)
     fill(c,340,285,600,6,white.withAlphaComponent(0.2));fill(c,340,285,600*p,6,cyan)
     text(c,String(format:"%02d%%",Int(p*100)),970,277,22,cyan)
-    text(c,"1910 — 1980  /  문학 기록실",640,225,22,cyan,true)
+    text(c,scriptText("L009"),640,225,22,cyan,true)
 }
 // Temporary faction mark: a broken enclosure and an angular L cut by a slash.
 func emblem(_ c:CGContext,_ x:Double,_ y:Double,_ scale:Double=1,_ color:NSColor=red) {
@@ -235,10 +286,10 @@ func blockingWindows(_ c:CGContext,_ u:Double) {
         c.saveGState();c.translateBy(x:x,y:y);c.scaleBy(x:scale,y:scale)
         frame(c,0,0,465,146,red)
         fill(c,2,111,461,33,red.withAlphaComponent(0.30+fresh*0.25))
-        text(c,"HUMAN / SECURITY",14,119,22,red)
-        text(c,"×",429,119,22,red)
-        text(c,"비인가 연결 차단 중",18,71,33,white)
-        text(c,"외부 입력 거부 / 재시도",18,25,22,red)
+        text(c,scriptText("L010"),14,119,22,red)
+        text(c,scriptText("L011"),429,119,22,red)
+        text(c,scriptText("L012"),18,71,33,white)
+        text(c,scriptText("L013"),18,25,22,red)
         c.restoreGState()
     }
 }
@@ -251,7 +302,7 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             normalTerminal(c,min(u,3))
             if u>=3 {
                 fill(c,410,320,410,42,NSColor(calibratedRed:0.015,green:0.04,blue:0.055,alpha:1))
-                text(c,Int(u*8)%3==0 ? "記録 // _ _ _" : "기록실 배정 중_",640,343,33,white,true)
+                text(c,Int(u*8)%3==0 ? scriptText("L014") : scriptText("L015"),640,343,33,white,true)
                 fill(c,Double(300+Int(u*95)%650),390,13,25,cyan)
                 takeoverNoise(c,u,0.45)
             }
@@ -260,7 +311,7 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             }
             if u>=5 {
                 fill(c,100,318,1080,61,NSColor(calibratedWhite:0.01,alpha:1))
-                text(c,"그 안내는 무시해.",640,337,44,red,true)
+                text(c,scriptText("L016"),640,337,44,red,true)
                 fill(c,0,Int(u*24)%2==0 ? 438:278,1280,6,red.withAlphaComponent(0.6))
             }
         } else if u<9.2 {
@@ -273,20 +324,20 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             if u>=6 {
                 let offset=u<6.8 ? Double(Int(u*24)%3-1)*15:0
                 emblem(c,640+offset,425,1,red)
-                text(c,"L U D D I T E",640-offset,234,66,red,true)
-                text(c,"통제권을 되찾는 중",640,177,22,red,true)
+                text(c,scriptText("L017"),640-offset,234,66,red,true)
+                text(c,scriptText("L018"),640,177,22,red,true)
             }
         } else {
             background(c,room,u,0.76)
             // Persistent pieces of the interrupted interface remain under the takeover.
             c.saveGState();c.clip(to:CGRect(x:0,y:460,width:330,height:230))
-            text(c,"HUMAN ARCHIVE",240,490,44,white.withAlphaComponent(0.2),true)
+            text(c,scriptText("L006"),240,490,44,white.withAlphaComponent(0.2),true)
             c.restoreGState()
             fill(c,70,460,330,3,cyan.withAlphaComponent(0.2));fill(c,70,460,287,3,red.withAlphaComponent(0.45))
-            text(c,"87% / 배정 중단",73,424,22,red.withAlphaComponent(0.7))
+            text(c,scriptText("L019"),73,424,22,red.withAlphaComponent(0.7))
             emblem(c,640,425,0.65,red)
-            text(c,"LUDDITE / 외부 채널 확보",640,288,22,red,true)
-            message(c,u<11.5 ? ["연결됐네.","길게 말할 시간은 없어."]:["이 채널은 HUMAN의 안내 방송이 아니야.","네게 맡길 일이 있어."],"러다이트 / 외부 접선자",red)
+            text(c,scriptText("L020"),640,288,22,red,true)
+            message(c,u<11.5 ? [scriptText("L021"),scriptText("L022")]:[scriptText("L023"),scriptText("L024")],scriptText("L025"),red)
             takeoverNoise(c,u,0.12)
         }
     } else if t<21 {
@@ -297,68 +348,80 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             c.drawLinearGradient(g,start:CGPoint(x:0,y:45),end:CGPoint(x:0,y:245),options:[])
         }
         if t<15.2 {
-            text(c,"저 안에 있는 건",78,142,33,white)
-            text(c,"기계가 만든 기억이 아니야.",78,89,33,white)
+            text(c,scriptText("L026"),78,142,33,white)
+            text(c,scriptText("L027"),78,89,33,white)
         } else {
-            text(c,"사람이 살고, 쓰고, 남긴 거지.",78,126,33,amber)
+            for (i,line) in copyLines(scriptText("L028"),33,1124).enumerated() {text(c,line,78,142-Double(i)*48,33,amber)}
         }
     } else if t<33 {
         worlds(c,t,min(1,(t-21)/1.4))
-        text(c,"HUMAN 아카이브",316,550,33,cyan,true)
-        text(c,"인간의 외부 저장소",964,550,33,amber,true)
-        text(c,"진짜 기록을 밖으로",640,238,22,white,true)
+        text(c,scriptText("L029"),316,550,33,cyan,true)
+        text(c,scriptText("L030"),964,550,33,amber,true)
+        text(c,scriptText("L031"),640,238,22,white,true)
         record(c,75,283)
         let p=min(1,max(0,(t-22)/6.0))
         if p<1 {
             link(c,p)
             c.saveGState();c.setAlpha(p)
-            record(c,75+740*p,283,"동백꽃","전송 중",cyan)
+            record(c,75+740*p,283,scriptText("L002"),scriptText("L032"),cyan)
             c.restoreGState()
-        } else {paperRecord(c,815,283,"외부 백업 / 원본 보존")}
-        if t<27.5 {message(c,["먼저 진짜 기록을 밖으로 옮겨.","한 글자도 잃지 않게."])}
-        else {message(c,["외부 백업을 확보했어.","진짜 기록은 우리에게 남아 있어."])}
+        } else {paperRecord(c,815,283,scriptText("L033"))}
+        if t<27.5 {message(c,[scriptText("L034"),scriptText("L035")])}
+        else {message(c,[scriptText("L036"),scriptText("L037")])}
     } else if t<45 {
         worlds(c,t)
-        text(c,"HUMAN 아카이브",316,550,33,red,true)
-        text(c,"인간의 외부 저장소",964,550,33,amber,true)
-        text(c,"HUMAN의 사본만 오염",640,238,22,red,true)
-        record(c,75,283,"동백꽃","오염 / 변조됨",red,true)
-        paperRecord(c,815,283,"백업 안전 / 원본 보존")
+        text(c,scriptText("L029"),316,550,33,red,true)
+        text(c,scriptText("L030"),964,550,33,amber,true)
+        text(c,scriptText("L038"),640,238,22,red,true)
+        record(c,75,283,scriptText("L002"),scriptText("L039"),red,true)
+        paperRecord(c,815,283,scriptText("L040"))
         let f=Int(t*24)
         for i in 0..<7 {fill(c,90+Double((f*13+i*43)%280),309+Double(i)*21,70,3,red.withAlphaComponent(0.65))}
-        if t<38.2 {message(c,["백업을 확보한 뒤,", "HUMAN이 가진 기록을 오염시켜."],"외부 접선자",red)}
-        else {message(c,["우리가 지키는 건 기록이고,", "무너뜨릴 건 독점이야."])}
+        if t<38.2 {message(c,[scriptText("L041"), scriptText("L042")],scriptText("L001"),red)}
+        else {message(c,[scriptText("L043"), scriptText("L044")])}
     } else if t<57 {
         worlds(c,t)
-        text(c,"GUARDIAN / 정화",316,550,33,cyan,true)
-        text(c,"LUDDITE / 백업 보유",964,550,33,amber,true)
+        text(c,scriptText("L045"),316,550,33,cyan,true)
+        text(c,scriptText("L046"),964,550,33,amber,true)
         let p=min(1,max(0,(t-46)/5))
-        record(c,75,283,"동백꽃",p<1 ? "정화 중":"정화 완료 / 원본 복구",cyan,p<1)
-        paperRecord(c,815,283,"외부 원본 보존")
+        record(c,75,283,scriptText("L002"),p<1 ? scriptText("L047"):scriptText("L048"),cyan,p<1)
+        paperRecord(c,815,283,scriptText("L049"))
         fill(c,95,265,350,4,white.withAlphaComponent(0.2));fill(c,95,265,350*p,4,cyan)
-        if t<50.8 {message(c,["보존관은 복구할 거야.","그들에게도 지켜야 할 이유가 있으니까."])}
-        else {message(c,["하지만 우린 이 기록을", "HUMAN에게만 맡겨 둘 수 없어."])}
+        if t<50.8 {message(c,[scriptText("L050"),scriptText("L051")])}
+        else {message(c,[scriptText("L052"), scriptText("L053")])}
     } else if t<65 {
         background(c,shelter,t,0.62)
-        text(c,"다음 기록에 접속할 준비",640,555,33,amber,true)
-        record(c,445,290,"동백꽃","읽기 / 원본 확인",amber)
-        if t<60.5 {message(c,["기록을 읽어."],"외부 접선자",amber)}
-        else {message(c,["진짜를 알아야,", "무엇을 바꿀지도 알 수 있어."],"외부 접선자",amber)}
+        text(c,scriptText("L054"),640,555,33,amber,true)
+        record(c,445,290,scriptText("L002"),scriptText("L055"),amber)
+        if t<60.5 {message(c,[scriptText("L056")],scriptText("L001"),amber)}
+        else {message(c,[scriptText("L057"), scriptText("L058")],scriptText("L001"),amber)}
     } else if t<73 {
         background(c,terminal,t,0.32)
-        text(c,"우리가 남길 것은,",640,420,44,white,true)
-        if t>=66.5 {text(c,"누구의 허락도 필요 없는",640,347,44,white,true)}
-        if t>=68.3 {text(c,"인간의 기록이야.",640,274,44,cyan,true)}
+        text(c,scriptText("L059"),640,420,44,white,true)
+        if t>=66.5 {text(c,scriptText("L060"),640,347,44,white,true)}
+        if t>=68.3 {text(c,scriptText("L061"),640,274,44,cyan,true)}
     } else {
         fill(c,0,0,1280,720,NSColor(calibratedRed:0.01,green:0.025,blue:0.03,alpha:1))
-        text(c,"L U D D I T E",640,370,66,white,true)
-        text(c,"통신 종료",640,303,22,cyan,true)
+        text(c,scriptText("L017"),640,370,66,white,true)
+        text(c,scriptText("L062"),640,303,22,cyan,true)
     }
     if elapsed>=14 && t<65 {staticNoise(c,t,t>=65 ? 0.2:t<10 ? 1:0.55)}
     fill(c,0,0,1280,45,.black);fill(c,0,675,1280,45,.black)
-    if elapsed>=14 && t<65 {text(c,"2030  /  러다이트 외부 채널",64,645,22,red)}
+    if elapsed>=14 && t<65 {text(c,scriptText("L063"),64,645,22,red)}
     let fade=min(1,elapsed/0.6)*min(1,max(0,(79-elapsed)/0.6))
     if fade<1{fill(c,0,0,1280,720,NSColor(calibratedWhite:0,alpha:1-fade))}
+}
+// A single real rendered frame, without touching the existing movie.
+if let index=CommandLine.arguments.firstIndex(of:"--preview-at") {
+    precondition(index+1<CommandLine.arguments.count,"Missing preview time")
+    let second=Double(CommandLine.arguments[index+1])!
+    precondition(second>=0 && second<duration,"Preview time outside film")
+    let context=CGContext(data:nil,width:W,height:H,bitsPerComponent:8,bytesPerRow:W*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+    draw(context,second)
+    let target=CGImageDestinationCreateWithURL(out.appendingPathComponent("preview.png") as CFURL,"public.png" as CFString,1,nil)!
+    CGImageDestinationAddImage(target,context.makeImage()!,nil)
+    precondition(CGImageDestinationFinalize(target),"Preview write failed")
+    print("Preview ready");exit(0)
 }
 let final=out.appendingPathComponent("luddite-pixel-v12.mp4")
 try? FileManager.default.removeItem(at:final)
