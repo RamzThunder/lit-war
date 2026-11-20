@@ -22,8 +22,8 @@ export class SessionState {
     const previous = this.lesson?.phase, hadEvent = Boolean(this.lesson?.event);
     this.lesson = lesson ? { ...lesson, endsAt: lesson.left == null ? null : performance.now() + lesson.left, event: lesson.event ? { endsAt: performance.now() + lesson.event.left } : null } : null;
     if (announce && lesson && Boolean(lesson.event) !== hadEvent) {
-      if (lesson.event) this.notice(this.me?.team === 'red' ? '⚠️ 오염 경보! 1분 동안 미션을 깨면 미끼를 심을 수 있어요 (점수 2배)' : '⚠️ 오염 경보! 러다이트가 미끼를 심어요. 오염된 기록을 찾아 정화하세요 (점수 2배)', 'bad');
-      else this.notice('오염 경보가 끝났어요.', 'info');
+      // The start is shown in the alert slot over the game; only announce the end.
+      if (!lesson.event) this.notice('오염 경보가 끝났어요.', 'info');
     }
     // A fresh opening (first time or the teacher replayed it) must be watched again.
     if (lesson?.opening && lesson.opening.id !== this.openingId) this.openingWatched = false;

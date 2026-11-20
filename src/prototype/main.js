@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+import '../shared/system.css';
 import './style.css';
 import { SessionState } from './network/SessionState.js';
 import { bindSession } from './ui/bindSession.js';
