@@ -35,7 +35,7 @@ function connect() {
     else { $('#conn').textContent = '연결 끊김 — 새로고침하세요'; }
   });
 }
-const send = data => socket?.readyState === WebSocket.OPEN && socket.send(JSON.stringify(data));
+const send = data => { if (socket?.readyState !== WebSocket.OPEN) return false; socket.send(JSON.stringify(data)); return true; };
 
 function handle(event) {
   switch (event.type) {
@@ -55,7 +55,7 @@ function handle(event) {
       break;
     case 'lesson': setLesson(event.lesson); renderLesson(); break;
     case 'scores': view.scores = event.scores; renderScores(); break;
-    case 'roster': view.roster = event.roster; renderRoster(); renderScores(); break;
+    case 'roster': view.roster = event.roster; renderRoster(); renderScores(); if (view.lesson?.phase === 'opening') renderLesson(); break;
     case 'feed': view.feed = [...view.feed.slice(-29), event.item]; renderFeed(); break;
     case 'watch-start': addRaid(event.raid); watch(event.raid.id); break;
     case 'watch-move': {
@@ -87,7 +87,13 @@ function setLesson(lesson) {
   view.lesson = lesson; view.endsAt = lesson.left == null ? null : performance.now() + lesson.left;
   view.eventEndsAt = lesson.event ? performance.now() + lesson.event.left : null;
 }
-function flash(message) { $('#conn').textContent = message; setTimeout(() => { if (socket?.readyState === WebSocket.OPEN) { $('#conn').textContent = '연결됨'; } }, 3000); }
+// Server replies such as "아직 영상을 보는 학생이 있어요" must be seen, so show them as a toast.
+let toastTimer = null;
+function flash(message) {
+  const toast = $('#toast'); toast.textContent = message; toast.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.hidden = true; }, 4000);
+  if (view.lesson) renderLesson();
+}
 
 // ---- render --------------------------------------------------------------------------
 const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
@@ -107,12 +113,12 @@ function renderLesson() {
   $('#start').hidden = !idle; $('#minutes').closest('label').hidden = !idle;
   // During the opening the timer is stopped; start unlocks once every student finished.
   const opening = phase === 'opening' ? view.lesson.opening : null;
-  $('#opening').hidden = !idle; $('#opening').textContent = opening ? '🎬 다시 재생' : '🎬 오프닝 재생';
+  $('#opening').hidden = !idle; $('#opening').disabled = false; $('#opening').textContent = opening ? '🎬 다시 재생' : '🎬 오프닝 재생';
   $('#start').disabled = Boolean(opening && !opening.ready);
   $('#force-start').hidden = !opening || opening.ready;
   $('#opening-chip').hidden = !opening;
   if (opening) {
-    $('#opening-chip').textContent = opening.ready ? `🎬 모두 시청 완료 (${opening.total}명) · 시작할 수 있어요` : `🎬 오프닝 시청 중 · ${opening.done} / ${opening.total}명 완료`;
+    $('#opening-chip').textContent = opening.ready ? `🎬 모두 시청 완료 (${opening.total}명) · 시작할 수 있어요` : `🎬 오프닝 · ${openingBreakdown()} · ${opening.done} / ${opening.total}명 완료`;
     $('#opening-chip').classList.toggle('ready', opening.ready);
   }
   $('#pause').hidden = phase !== 'playing';
@@ -120,6 +126,15 @@ function renderLesson() {
   $('#end').hidden = idle;
   $('#event').hidden = phase !== 'playing'; $('#event').disabled = Boolean(view.lesson.event);
   renderTimer(); renderEntry();
+}
+// Per-student opening status reported by each student's browser.
+const OPENING_TAG = { waiting: '⏳ 대기', click: '👆 재생 버튼 대기', playing: '▶ 시청 중', done: '✓ 시청 완료', error: '⚠ 재생 오류' };
+const openingTag = o => (!o ? '' : o.status === 'loading' ? `⬇ 불러오는 중 ${o.pct}%` : OPENING_TAG[o.status] ?? '');
+function openingBreakdown() {
+  const online = view.roster.filter(p => p.online && p.opening);
+  const count = test => online.filter(p => test(p.opening.status)).length;
+  const parts = [[count(s => s === 'loading' || s === 'waiting'), '불러오는 중'], [count(s => s === 'playing'), '시청 중'], [count(s => s === 'click' || s === 'error'), '확인 필요']];
+  return parts.filter(([n]) => n).map(([n, label]) => `${label} ${n}`).join(' · ') || '준비 중';
 }
 function renderScores() {
   const scores = view.scores; if (!scores) return;
@@ -150,7 +165,7 @@ function renderRoster() {
       li.className = p.online ? 'online' : 'offline';
       li.innerHTML = '<span class="dot"></span><span class="name"></span><span class="tag"></span><span class="missions"></span>';
       li.querySelector('.name').textContent = p.name;
-      li.querySelector('.tag').textContent = p.raiding ? '⚡공격 중' : '';
+      li.querySelector('.tag').textContent = p.raiding ? '⚡공격 중' : openingTag(p.opening);
       li.querySelector('.missions').textContent = `미션 ${p.missions}`;
       if (p.online) {
         const kick = document.createElement('button'); kick.type = 'button'; kick.textContent = '퇴장';
@@ -281,7 +296,9 @@ setInterval(renderTimer, 250);
 $('#start').addEventListener('click', () => send({ type: 'start', minutes: Number($('#minutes').value) }));
 $('#opening').addEventListener('click', () => {
   if (view.lesson?.phase === 'opening' && !confirm('모든 학생의 오프닝 영상을 처음부터 다시 틀까요?')) return;
-  send({ type: 'opening' });
+  if (!send({ type: 'opening' })) { flash('서버와 연결이 끊겨 있어요. 잠시 후 다시 눌러 주세요.'); return; }
+  // Immediate feedback until the server's reply re-renders the controls.
+  $('#opening').disabled = true; $('#opening').textContent = '⏳ 보내는 중…';
 });
 $('#force-start').addEventListener('click', () => { if (confirm('아직 영상을 보는 학생이 있어요. 기다리지 않고 바로 시작할까요?')) send({ type: 'start', minutes: Number($('#minutes').value), force: true }); });
 $('#pause').addEventListener('click', () => send({ type: 'pause' }));

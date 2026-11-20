@@ -212,6 +212,21 @@ test('opening video: no timer, students report finishing, start waits for everyo
   assert.ok(data(room.command('t', { type: 'start', minutes: 30, force: true }, 80), 'lesson', '*'), 'teacher may start without waiting');
   assert.equal(room.lesson.phase, 'playing'); assert.equal(room.lesson.opening, null);
 });
+test('opening status: students report loading/playing and the teacher roster shows it', () => {
+  const room = new RoomEngine({}, () => .92);
+  room.joinTeacher('t', 'hash', 0); room.join('a', 'A', 'ta', 0);
+  assert.deepEqual(room.command('a', { type: 'opening-status', status: 'loading', pct: 30 }, 1), [], 'ignored outside the opening');
+  const started = room.command('t', { type: 'opening' }, 2);
+  assert.deepEqual(data(started, 'roster', 't').roster[0].opening, { status: 'waiting' });
+  assert.deepEqual(data(room.command('a', { type: 'opening-status', status: 'loading', pct: 250 }, 3), 'roster', 't').roster[0].opening, { status: 'loading', pct: 100 });
+  assert.deepEqual(room.command('a', { type: 'opening-status', status: 'hacked' }, 4), [], 'unknown status ignored');
+  assert.deepEqual(data(room.command('a', { type: 'opening-status', status: 'playing' }, 5), 'roster', 't').roster[0].opening, { status: 'playing' });
+  assert.deepEqual(data(room.command('a', { type: 'opening-done' }, 6), 'roster', 't').roster[0].opening, { status: 'done' });
+  room.command('t', { type: 'opening' }, 7);
+  assert.deepEqual(room.roster()[0].opening, { status: 'waiting' }, 'replay resets statuses');
+  room.command('a', { type: 'opening-done' }, 8); room.command('t', { type: 'start', minutes: 30 }, 9);
+  assert.equal(room.roster()[0].opening, null, 'no status outside the opening');
+});
 test('opening restart clears progress; finishing all students unlocks start', () => {
   const room = new RoomEngine({}, () => .92);
   room.joinTeacher('t', 'hash', 0); room.join('a', 'A', 'ta', 0);

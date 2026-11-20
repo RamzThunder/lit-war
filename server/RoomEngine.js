@@ -89,6 +89,13 @@ export class RoomEngine {
     // `id` changes on every replay so clients know to watch again.
     return { id: this.lesson.opening?.at ?? 0, done: finished, total: online.length, ready: finished === online.length };
   }
+  // What the teacher sees per student during the opening: done, or the last status the
+  // student reported (loading %, waiting for a click, playing, error).
+  #openingStatus(token, s) {
+    if (this.lesson.phase !== 'opening' || !s) return null;
+    if (this.openingWatched(token)) return { status: 'done' };
+    return s.opening ?? { status: 'waiting' };
+  }
   openingWatched(token) { return Boolean(this.lesson.opening?.done.includes(token)); }
   // Joins and leaves change the opening head count; the worker calls this after a join.
   openingUpdate(now = Date.now()) { return this.lesson.phase === 'opening' ? [this.#lessonMessage(now)] : []; }
@@ -97,7 +104,7 @@ export class RoomEngine {
     const live = new Map([...this.sessions.values()].map(s => [s.token, s]));
     return [...this.profiles.entries()].map(([token, p]) => {
       const s = live.get(token);
-      return { name: p.name, team: p.team, missions: s ? s.game.snapshot.missions : p.game.missions, sabotageRights: p.sabotageRights, raidRights: p.raidRights, online: Boolean(s), raiding: Boolean(s?.raid) };
+      return { name: p.name, team: p.team, missions: s ? s.game.snapshot.missions : p.game.missions, sabotageRights: p.sabotageRights, raidRights: p.raidRights, online: Boolean(s), raiding: Boolean(s?.raid), opening: this.#openingStatus(token, s) };
     });
   }
   teacherWelcome(now = Date.now()) {
@@ -158,7 +165,8 @@ export class RoomEngine {
         return this.#startEvent(now);
       case 'opening':
         if (phase === 'playing' || phase === 'paused') return error('게임 중에는 오프닝을 틀 수 없어요.');
-        return this.#setPhase('opening', now, { endsAt: null, remainMs: null, opening: { done: [], at: now } });
+        for (const s of this.sessions.values()) s.opening = null;
+        return [...this.#setPhase('opening', now, { endsAt: null, remainMs: null, opening: { done: [], at: now } }), ...this.teacherUpdate()];
       case 'start': {
         if (phase === 'playing' || phase === 'paused') return error('이미 진행 중이에요.');
         if (phase === 'opening' && !this.openingProgress().ready && !message.force) {
@@ -331,9 +339,14 @@ export class RoomEngine {
   #openingDone(s, now) {
     const opening = this.lesson.opening;
     if (this.lesson.phase !== 'opening' || !opening || opening.done.includes(s.token)) return [];
-    opening.done.push(s.token); this.lessonDirty = true;
+    opening.done.push(s.token); this.lessonDirty = true; s.opening = null;
     const progress = this.openingProgress();
-    return [this.#lessonMessage(now), ...(progress.ready ? this.#feed(`🎬 모든 학생이 오프닝을 봤어요 (${progress.total}명)`, 'lesson', now) : [])];
+    return [this.#lessonMessage(now), ...this.teacherUpdate(), ...(progress.ready ? this.#feed(`🎬 모든 학생이 오프닝을 봤어요 (${progress.total}명)`, 'lesson', now) : [])];
+  }
+  #openingReport(s, { status, pct }) {
+    if (this.lesson.phase !== 'opening' || !['loading', 'click', 'playing', 'error'].includes(status)) return [];
+    s.opening = status === 'loading' ? { status, pct: Math.max(0, Math.min(100, Math.round(Number(pct) || 0))) } : { status };
+    return this.teacherUpdate();
   }
   // ---- clock -----------------------------------------------------------------------------
   tick(now = Date.now()) {
@@ -363,6 +376,7 @@ export class RoomEngine {
     if (message.type === 'move') return this.#move(s, message, now);
     if (message.type === 'shock') return this.#shock(s, now);
     if (message.type === 'opening-done') return this.#openingDone(s, now);
+    if (message.type === 'opening-status') return this.#openingReport(s, message);
     if (!this.active && message.type !== 'close') return error(PHASE_BLOCKED[this.lesson.phase]);
     if (s.raid && ['open', 'repair', 'raid', 'sabotage-start', 'sabotage', 'cleanse', 'bait'].includes(message.type)) return error('공격이 끝난 뒤에 할 수 있어요.');
     const at = { x: message.x, y: message.y };

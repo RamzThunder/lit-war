@@ -117,3 +117,4 @@ button.film{background:#2c3f63;color:#d6e4ff;border-color:#6f8fd0}
 .opening-chip.ready{border-color:#5a8a3a;background:#1b2a14;color:#d6f0a8}
 body.tv .opening-chip{font-size:22px;padding:10px 16px}
 .phase.opening{border-color:#6f8fd0;color:#d6e4ff}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:20;max-width:calc(100% - 32px);padding:14px 22px;background:#3a2a10;border:1px solid #d9a441;color:#ffe2a8;font-size:16px;font-weight:bold;box-shadow:0 10px 30px #000a}
