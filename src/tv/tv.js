@@ -5,7 +5,7 @@ import qrcode from 'qrcode-generator';
 import { ERAS } from '../prototype/minigames/wiring.js';
 import { teamName, teamShort } from '../prototype/teams.js';
 import { eraOwner, isClose, teamTotal, heldCount } from '../shared/eras.js';
-import { createRoom, savedLogin, clock, timeLeft, feedTime, joinUrl } from '../teacher/room.js';
+import { createRoom, savedLogin, clock, timeLeft, feedTime, joinUrl, awayList } from '../teacher/room.js';
 // View-only classroom TV. Same teacher socket as the console, but no controls.
 // Screens: lobby (waiting / opening), board (playing, paused, ended), raid (live spectate).
 const $ = selector => document.querySelector(selector);
@@ -65,6 +65,7 @@ function renderLobby() {
       names.add(p.name);
       const chip = document.createElement('span'); chip.textContent = p.name;
       if (!p.online) chip.className = 'off';
+      else if (p.away) { chip.className = 'away'; chip.textContent = `🚨 ${p.name}`; }
       else if (opening && p.opening?.status === 'done') chip.className = 'done';
       else if (knownNames && !knownNames.has(p.name)) chip.className = 'new';
       return chip;
@@ -130,6 +131,13 @@ function renderClock() {
   if (raid) $('#raid-seconds').textContent = String(Math.max(0, Math.ceil((raid.endsAt - performance.now()) / 1000))).padStart(2, '0');
 }
 setInterval(renderClock, 250);
+// Warning on every screen while someone is off the game tab (opening or game only).
+function renderAway() {
+  const away = awayList(view);
+  $('#away-bar').hidden = !away.length;
+  if (away.length) $('#away-names').textContent = `${away.length}명 · ${away.map(p => `${p.name} ${clock(performance.now() - p.awaySince).replace(/^0/, '')}`).join(' · ')}`;
+}
+setInterval(renderAway, 1000);
 
 // ---- raid ----------------------------------------------------------------------------
 async function ensureSpectator() {
@@ -164,10 +172,10 @@ function renderRaidSide() {
 room.subscribe(async (type, detail) => {
   switch (type) {
     case 'status': $('#conn').textContent = detail.text; break;
-    case 'welcome': lastOwners = {}; knownNames = null; renderAll(); break;
+    case 'welcome': lastOwners = {}; knownNames = null; renderAll(); renderAway(); break;
     case 'lesson': renderLobby(); renderBoard(); screen(); break;
     case 'scores': case 'contam': renderBoard(); break;
-    case 'roster': renderLobby(); renderBoard(); break;
+    case 'roster': renderLobby(); renderBoard(); renderAway(); break;
     case 'feed': renderFeed(); break;
     case 'raids': renderRaidSide(); break;
     case 'watch':

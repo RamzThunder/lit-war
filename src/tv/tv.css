@@ -120,3 +120,7 @@ h1,h2,p{margin:0}
 .result.blue{background:var(--blue-dim);box-shadow:inset 0 0 0 2px var(--blue);color:var(--blue)}
 .result small{display:block;font-size:24px;font-weight:500;color:var(--muted);margin-top:6px}
 .queue{font-size:24px;color:var(--muted);margin-top:auto}
+/* Away warning: sits in the bottom gutter on every screen */
+.away-bar{position:absolute;left:72px;right:72px;bottom:8px;z-index:5;display:flex;align-items:center;gap:20px;padding:8px 22px;border-radius:var(--r-sm);background:var(--danger);font-size:26px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;box-shadow:0 8px 30px #e5484d55}
+.away-bar b{font-weight:800}
+.lobby .names span.away{background:var(--danger);color:#fff}

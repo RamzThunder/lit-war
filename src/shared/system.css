@@ -11,6 +11,8 @@
   --blue:#5ea8ff; --blue-dim:#5ea8ff1f; --red:#ff6f61; --red-dim:#ff6f611f;
   /* 경보색 = 노랑: 오염 경보·오염·접전에만. 공격(감전)은 빨강 */
   --alert:#f0c65d; --alert-dim:#f0c65d1f; --alert-ink:#2b2205;
+  /* 수업 이탈 경고: 채운 빨간 띠 (팀 빨강 글자와 구분되게 채움으로만 쓴다) */
+  --danger:#e5484d;
   --sys:'Galmuri11',monospace;
   --ui:'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
   --r:12px; --r-sm:8px;
@@ -54,3 +56,4 @@
 /* 경보 띠: 이벤트 때만. 미세한 주사선으로 '신호 간섭' */
 .alertband{background:var(--alert-dim);border-radius:var(--r);position:relative;overflow:hidden}
 .alertband::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,#f0c65d10 0 1px,transparent 1px 4px);pointer-events:none}
+.sys-log li.away{border-color:var(--danger)}

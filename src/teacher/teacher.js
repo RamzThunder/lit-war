@@ -5,7 +5,7 @@ import qrcode from 'qrcode-generator';
 import { ERAS, eraLabel } from '../prototype/minigames/wiring.js';
 import { teamName, teamShort } from '../prototype/teams.js';
 import { eraOwner, isClose, teamTotal, heldCount } from '../shared/eras.js';
-import { createRoom, savedLogin, clock, timeLeft, feedTime, joinUrl } from './room.js';
+import { createRoom, savedLogin, clock, timeLeft, feedTime, joinUrl, awayList } from './room.js';
 // Teacher console. The classroom TV is a separate view-only page (tv.html).
 const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
@@ -59,6 +59,8 @@ function renderLesson() {
   renderTimer();
 }
 setInterval(() => { renderTimer(); renderRaidTimer(); }, 250);
+// Away durations tick live while someone is off the game tab.
+setInterval(() => { if (awayList(view).length) renderRoster(); }, 1000);
 
 // Per-student opening status reported by each student's browser.
 const OPENING_TAG = { waiting: '⏳ 대기', click: '👆 재생 버튼 대기', playing: '▶ 시청 중', done: '✓ 시청 완료', error: '⚠ 재생 오류' };
@@ -94,9 +96,18 @@ function renderScores() {
 }
 
 // ---- roster: fixed 가나다 order so rows never jump; disconnected rows stay in place ------
+// 수업 이탈 (any reason: another tab/window, minimised, full screen off) stays on screen in a
+// red banner at the bottom until the student is back.
+const awayTime = p => clock(performance.now() - p.awaySince).replace(/^0/, '');
+function renderAway() {
+  const away = awayList(view), banner = $('#away-banner');
+  banner.hidden = !away.length;
+  if (away.length) $('#away-names').textContent = `${away.length}명 · ${away.map(p => `${p.name} ${awayTime(p)}`).join(' · ')}`;
+}
 function renderRoster() {
-  const online = view.roster.filter(p => p.online).length, off = view.roster.length - online;
-  $('#online-count').innerHTML = `접속 <b>${online}</b> / ${view.roster.length}${off ? ` · <b>끊김 ${off}명</b>` : ''}`;
+  renderAway();
+  const online = view.roster.filter(p => p.online).length, off = view.roster.length - online, away = awayList(view).length;
+  $('#online-count').innerHTML = `접속 <b>${online}</b> / ${view.roster.length}${away ? ` · <b class="c-danger">🚨 수업 이탈 ${away}명</b>` : ''}${off ? ` · <b>끊김 ${off}명</b>` : ''}`;
   for (const team of ['blue', 'red']) {
     const list = view.roster.filter(p => p.team === team).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     $(`#count-${team}`).textContent = `접속 ${list.filter(p => p.online).length} / ${list.length}`;
@@ -104,10 +115,11 @@ function renderRoster() {
     if (!list.length) { ul.innerHTML = '<li class="empty-note">아직 없어요</li>'; continue; }
     ul.replaceChildren(...list.map(p => {
       const li = document.createElement('li');
-      li.className = p.online ? '' : 'off';
+      li.className = !p.online ? 'off' : p.away ? 'away' : '';
+      if (p.awayCount) li.title = `게임 화면 이탈 ${p.awayCount}번`;
       li.innerHTML = `<span class="dot ${p.online ? 'on' : ''}"></span><span class="name"></span><span class="st"></span><span class="m">${p.missions}</span>`;
       li.querySelector('.name').textContent = p.name;
-      li.querySelector('.st').textContent = !p.online ? '끊김' : p.raiding ? '⚡ 공격 중' : openingTag(p.opening);
+      li.querySelector('.st').textContent = !p.online ? '끊김' : p.away ? `🚨 수업 이탈 ${awayTime(p)}` : p.raiding ? '⚡ 공격 중' : openingTag(p.opening) || (p.awayCount ? `이탈 ${p.awayCount}회` : '');
       if (p.online) {
         const more = document.createElement('button'); more.type = 'button'; more.className = 'more'; more.textContent = '⋯';
         more.setAttribute('aria-label', `${p.name} 학생 메뉴`);

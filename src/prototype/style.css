@@ -140,3 +140,13 @@ body[data-team=blue] .s-actions #use-raid,body[data-team=blue] .s-actions #use-s
   @keyframes s-alert-in{0%{filter:hue-rotate(40deg) blur(1px)}}
   #toasts{top:120px}
 }
+/* Full-screen gate: top-layer dialog so it also covers mini-game windows and the opening */
+#fs-gate.fs-gate{width:min(520px,calc(100% - 32px));padding:36px 32px 32px;border:0;border-radius:16px;background:var(--shell);color:var(--shell-text);text-align:center;box-shadow:0 30px 80px #000c}
+#fs-gate::backdrop{background:#05080ce6;backdrop-filter:blur(6px)}
+.fs-gate-icon{font-family:var(--sys);font-size:56px;line-height:1;color:var(--side)}
+#fs-gate h2{font-size:22px;margin:16px 0 10px;color:var(--shell-text)}
+#fs-gate p{font-size:14px;line-height:1.7;color:var(--shell-muted)}
+#fs-gate p b{color:var(--shell-text)}
+#fs-gate kbd{background:var(--shell-raised);color:var(--shell-text);border:0;box-shadow:inset 0 0 0 1px var(--shell-line)}
+#fs-gate-enter{margin-top:24px;width:100%;padding:14px;font:inherit;font-weight:800;font-size:16px;border:0;border-radius:var(--r-sm);cursor:pointer;background:var(--side);color:#fff}
+body[data-team=solo] #fs-gate-enter{background:var(--text);color:var(--bg)}

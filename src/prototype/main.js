@@ -9,6 +9,7 @@ import { bindUI } from './ui/bindUI.js';
 import { bindTouch } from './ui/bindTouch.js';
 import { bindOpening } from './ui/bindOpening.js';
 import { bindShortcuts } from './ui/bindShortcuts.js';
+import { bindFocus } from './ui/bindFocus.js';
 const state = new SessionState();
 bindSession(state);
 // Dev-only handle for automated browser checks; not included in production builds.
@@ -17,6 +18,7 @@ const updateContext = bindUI(state);
 const touch = bindTouch();
 bindOpening(state);
 bindShortcuts(state);
+bindFocus(state);
 new Phaser.Game({
   type: Phaser.AUTO, parent: 'game', backgroundColor: '#101b25',
   pixelArt: true, roundPixels: true, antialias: false,

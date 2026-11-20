@@ -227,6 +227,35 @@ test('opening status: students report loading/playing and the teacher roster sho
   room.command('a', { type: 'opening-done' }, 8); room.command('t', { type: 'start', minutes: 30 }, 9);
   assert.equal(room.roster()[0].opening, null, 'no status outside the opening');
 });
+test('leaving the game tab: counted during the opening and the game, shown to teachers, told on return', () => {
+  const room = new RoomEngine({}, () => .92);
+  room.joinTeacher('t', 'hash', 0); room.join('a', 'A', 'ta', 0);
+  assert.deepEqual(room.command('a', { type: 'focus', away: true }, 1), [], 'not counted while waiting to start');
+  room.command('t', { type: 'start', minutes: 30 }, 2);
+  const left = room.command('a', { type: 'focus', away: true }, 1000);
+  assert.equal(data(left, 'roster', 't').roster[0].away, true);
+  assert.match(data(left, 'feed', 't').item.text, /A 수업 이탈 \(1번째\)/);
+  assert.deepEqual(room.command('a', { type: 'focus', away: true }, 1500), [], 'still away: no second count');
+  assert.equal(room.roster(4000)[0].awayFor, 3000);
+  const back = room.command('a', { type: 'focus', away: false }, 13000);
+  assert.deepEqual(data(back, 'away-back', 'a'), { type: 'away-back', count: 1, seconds: 12, reason: 'tab' });
+  assert.equal(data(back, 'roster', 't').roster[0].away, false);
+  const fs = room.command('a', { type: 'focus', away: true, reason: 'fullscreen' }, 14000);
+  assert.equal(room.roster()[0].awayCount, 2);
+  assert.equal(room.roster(14000)[0].awayFor, 0);
+  room.command('a', { type: 'focus', away: false }, 14500);
+  room.command('a', { type: 'focus', away: true, ms: 9000 }, 20000);
+  assert.equal(room.roster(20000)[0].awayFor, 9000, 'duration counts from when the game went off screen');
+  room.command('a', { type: 'focus', away: false }, 20500);
+  room.command('a', { type: 'focus', away: true, ms: 1e9 }, 30000);
+  assert.equal(room.roster(30000)[0].awayFor, 60000, 'capped at a minute');
+  assert.equal(data(fs, 'roster', 't').roster[0].awayReason, 'fullscreen');
+  assert.match(data(fs, 'feed', 't').item.text, /A 수업 이탈 \(2번째\)/);
+  room.command('t', { type: 'end' }, 15000);
+  assert.equal(room.roster()[0].away, false, 'ending the game clears the warning');
+  room.command('t', { type: 'reset' }, 16000);
+  assert.equal(room.roster()[0].awayCount, 0, 'reset clears the count');
+});
 test('opening restart clears progress; finishing all students unlocks start', () => {
   const room = new RoomEngine({}, () => .92);
   room.joinTeacher('t', 'hash', 0); room.join('a', 'A', 'ta', 0);

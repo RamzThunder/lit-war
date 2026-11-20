@@ -12,7 +12,7 @@ export function bindShortcuts(state) {
   const disarm = () => { armedUntil = 0; clearTimeout(armTimer); $('#use-raid').classList.remove('armed'); };
   // Never fire while the student is typing, a window is open, or the opening film plays.
   const blocked = () => typing(document.activeElement) || Boolean(document.querySelector('dialog[open]'))
-    || state.snapshot.terminalOpen || !$('#opening').hidden;
+    || state.snapshot.terminalOpen || !$('#opening').hidden || Boolean(state.gated);
 
   document.addEventListener('keydown', event => {
     const selector = KEYS[event.key];

@@ -35,7 +35,8 @@ export class SessionState {
     if (text) this.notice(...text);
   }
   get snapshot() { return this.online ? structuredClone(this.remote) : this.local.snapshot; }
-  get inputBlocked() { return this.online && !this.connected; }
+  // `gated` = the full-screen gate covers the game (see bindFocus).
+  get inputBlocked() { return (this.online && !this.connected) || Boolean(this.gated); }
   subscribe(fn) { this.listeners.add(fn); fn(this.snapshot); return () => this.listeners.delete(fn); }
   publish() { for (const fn of this.listeners) fn(this.snapshot); }
   subscribeSession(fn) { this.sessionListeners.add(fn); fn(this); return () => this.sessionListeners.delete(fn); }
@@ -98,6 +99,7 @@ export class SessionState {
           break;
         case 'scores': this.scores = event.scores; break;
         case 'lesson': this.setLesson(event.lesson, true); break;
+        case 'away-back': this.notice(`${event.reason === 'fullscreen' ? '⛶ 전체 화면을 껐어요' : '🚪 게임 화면을 벗어났어요'} (${event.count}번째, ${event.seconds}초) · 선생님 화면과 TV에 표시돼요`, 'warn'); break;
         case 'bait-offer': this.emit('bait-offer', event.offer); break;
         case 'bait-result': this.emit('bait-result', event); this.notice(event.message, event.ok ? 'good' : 'warn'); break;
         case 'contaminated':

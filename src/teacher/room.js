@@ -9,6 +9,10 @@ const store = {
 };
 export const savedLogin = () => ({ room: store.get('teacher-room') ?? '', key: store.get('teacher-key') ?? '' });
 
+// Students away from the game tab: the server sends how long; keep a local start time.
+const stampAway = roster => roster.map(p => ({ ...p, awaySince: p.away ? performance.now() - (p.awayFor ?? 0) : null }));
+export const awayList = view => view.roster.filter(p => p.online && p.away).sort((a, b) => a.awaySince - b.awaySince);
+
 export function createRoom() {
   const listeners = new Set();
   const emit = (type, detail = {}) => { for (const fn of listeners) fn(type, detail); };
@@ -63,7 +67,7 @@ export function createRoom() {
     switch (event.type) {
       case 'teacher-welcome':
         retry = 0; store.set('teacher-room', view.room); store.set('teacher-key', key);
-        Object.assign(view, { scores: event.scores, roster: event.roster, feed: event.feed ?? [], contam: event.contam ?? [] });
+        Object.assign(view, { scores: event.scores, roster: stampAway(event.roster), feed: event.feed ?? [], contam: event.contam ?? [] });
         setLesson(event.lesson);
         view.raids.clear(); view.watching = null; view.result = null;
         for (const raid of event.raids ?? []) addRaid(raid);
@@ -74,7 +78,7 @@ export function createRoom() {
         break;
       case 'lesson': setLesson(event.lesson); emit('lesson'); break;
       case 'scores': view.scores = event.scores; emit('scores'); break;
-      case 'roster': view.roster = event.roster; emit('roster'); break;
+      case 'roster': view.roster = stampAway(event.roster); emit('roster'); break;
       case 'feed': view.feed = [...view.feed.slice(-29), event.item]; emit('feed', event.item); break;
       case 'contam-log': view.contam = event.log; emit('contam'); break;
       case 'watch-start':

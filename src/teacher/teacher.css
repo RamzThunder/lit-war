@@ -127,3 +127,12 @@ h3 em{font-style:normal;color:var(--faint);font-weight:400}
 
 @media(max-width:1180px){main{grid-template-columns:240px minmax(0,1fr)}.col.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}.eras{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:760px){main{display:flex;flex-direction:column;overflow:auto}.col{overflow:visible}.col+.col{border-left:0;border-top:1px solid var(--line)}.roster{grid-template-columns:1fr}header{gap:10px;padding:0 14px}header .title{display:none}}
+/* Students away from the game tab */
+.roster li.away{background:#e5484d26!important;box-shadow:inset 3px 0 0 var(--danger)}.roster li.away .st{color:#ff9d9f;font-weight:700}
+.c-danger{color:#ff9d9f}
+/* Red banner at the bottom while anyone is away; part of the page flow so nothing is covered */
+.away-banner{flex:none;display:flex;align-items:center;gap:16px;padding:12px 24px;background:var(--danger);color:#fff;font-size:15px;font-weight:600;animation:away-in .4s ease-out}
+.away-banner b{font-size:16px;font-weight:800;white-space:nowrap}
+#away-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes away-in{from{transform:translateY(100%)}}
+@media(prefers-reduced-motion:reduce){.away-banner{animation:none}}

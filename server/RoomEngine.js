@@ -60,7 +60,7 @@ export class RoomEngine {
   #attach(session, now, player = null) {
     // Live raids are stored, so a session woken from hibernation rejoins its raid.
     const raid = [...this.raids.values()].find(r => r.attacker === session.id || r.defender === session.id);
-    Object.assign(session, { player: raid ? player : null, raid: raid?.id ?? null, pending: null, lastMove: now, lastSeen: now, rateAt: now, rateCount: 0 });
+    Object.assign(session, { away: null, player: raid ? player : null, raid: raid?.id ?? null, pending: null, lastMove: now, lastSeen: now, rateAt: now, rateCount: 0 });
     this.sessions.set(session.id, session); return session;
   }
   // ---- teacher -------------------------------------------------------------------------
@@ -100,11 +100,11 @@ export class RoomEngine {
   // Joins and leaves change the opening head count; the worker calls this after a join.
   openingUpdate(now = Date.now()) { return this.lesson.phase === 'opening' ? [this.#lessonMessage(now)] : []; }
   get active() { return ACTIVE.has(this.lesson.phase); }
-  roster() {
+  roster(now = Date.now()) {
     const live = new Map([...this.sessions.values()].map(s => [s.token, s]));
     return [...this.profiles.entries()].map(([token, p]) => {
       const s = live.get(token);
-      return { name: p.name, team: p.team, missions: s ? s.game.snapshot.missions : p.game.missions, sabotageRights: p.sabotageRights, raidRights: p.raidRights, online: Boolean(s), raiding: Boolean(s?.raid), opening: this.#openingStatus(token, s) };
+      return { name: p.name, team: p.team, missions: s ? s.game.snapshot.missions : p.game.missions, sabotageRights: p.sabotageRights, raidRights: p.raidRights, online: Boolean(s), raiding: Boolean(s?.raid), opening: this.#openingStatus(token, s), away: Boolean(s?.away), awayReason: s?.away ? s.awayReason : null, awayFor: s?.away ? now - s.away : null, awayCount: p.awayCount ?? 0 };
     });
   }
   teacherWelcome(now = Date.now()) {
@@ -139,13 +139,16 @@ export class RoomEngine {
   }
   #setPhase(phase, now, patch = {}) {
     Object.assign(this.lesson, { phase, ...patch }); this.lessonDirty = true;
+    // Away warnings only matter while students should be watching or playing.
+    if (phase === 'lobby' || phase === 'ended') for (const s of this.sessions.values()) s.away = null;
     const label = { opening: '🎬 오프닝 영상 재생', playing: '▶ 게임 시작', paused: '⏸ 잠시 멈춤', ended: '■ 게임 종료', lobby: '↺ 대기 상태' }[phase];
     return [this.#lessonMessage(now), ...this.#feed(label, 'lesson', now)];
   }
   #reset(now) {
     const out = this.#halt(now, '선생님이 게임을 초기화했어요.');
     this.scores = emptyScores(); this.scoresDirty = true;
-    for (const [token, p] of this.profiles) { Object.assign(p, { sabotageRights: 0, raidRights: 0, trap: null, game: { missions: 0, sabotages: [] } }); this.dirty.add(token); }
+    for (const [token, p] of this.profiles) { Object.assign(p, { sabotageRights: 0, raidRights: 0, trap: null, awayCount: 0, game: { missions: 0, sabotages: [] } }); this.dirty.add(token); }
+    for (const s of this.sessions.values()) s.away = null;
     this.contamLog = []; out.push(...this.#toTeachers({ type: 'contam-log', log: this.contamLog }));
     for (const [id, s] of this.sessions) { s.game = new GameState(s.profile.game, this.random); out.push(this.stateMessage(id, now)); }
     this.feedLog = [];
@@ -348,6 +351,26 @@ export class RoomEngine {
     s.opening = status === 'loading' ? { status, pct: Math.max(0, Math.min(100, Math.round(Number(pct) || 0))) } : { status };
     return this.teacherUpdate();
   }
+  // Leaving the game tab (another tab/window or minimised) during the opening or the game.
+  // The browser cannot stop it, so the teacher console and the TV show who is away; the
+  // student is told on return. Only whether the game is on screen is known, not where they went.
+  #focus(s, { away, reason, ms }, now) {
+    const counted = this.lesson.phase === 'opening' || this.lesson.phase === 'playing';
+    if (away && !s.away && counted) {
+      // `ms`: how long the game had already been off screen (debounce / grace), capped at 1 minute.
+      s.away = now - Math.min(60000, Math.max(0, Number(ms) || 0)); s.awayReason = reason === 'fullscreen' ? 'fullscreen' : 'tab';
+      s.profile.awayCount = (s.profile.awayCount ?? 0) + 1; this.dirty.add(s.token);
+      // Teachers see one wording (수업 이탈); the reason stays in the roster data.
+      return [...this.teacherUpdate(), ...this.#feed(`🚨 ${s.name} 수업 이탈 (${s.profile.awayCount}번째)`, 'away', now)];
+    }
+    if (!away && s.away) {
+      const seconds = Math.round((now - s.away) / 1000);
+      s.away = null;
+      const was = s.awayReason; s.awayReason = null;
+      return [{ to: s.id, data: { type: 'away-back', count: s.profile.awayCount, seconds, reason: was } }, ...this.teacherUpdate()];
+    }
+    return [];
+  }
   // ---- clock -----------------------------------------------------------------------------
   tick(now = Date.now()) {
     const out = [];
@@ -377,6 +400,7 @@ export class RoomEngine {
     if (message.type === 'shock') return this.#shock(s, now);
     if (message.type === 'opening-done') return this.#openingDone(s, now);
     if (message.type === 'opening-status') return this.#openingReport(s, message);
+    if (message.type === 'focus') return this.#focus(s, message, now);
     if (!this.active && message.type !== 'close') return error(PHASE_BLOCKED[this.lesson.phase]);
     if (s.raid && ['open', 'repair', 'raid', 'sabotage-start', 'sabotage', 'cleanse', 'bait'].includes(message.type)) return error('공격이 끝난 뒤에 할 수 있어요.');
     const at = { x: message.x, y: message.y };
