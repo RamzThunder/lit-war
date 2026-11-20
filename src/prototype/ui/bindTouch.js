@@ -31,7 +31,8 @@ export function bindTouch() {
   function update({ open, target, raid, inRange }) {
     let label = '', mode = '';
     if (raid?.role === 'attacker') { label = '⚡ 감전'; mode = inRange ? 'shock' : 'idle'; }
-    else if (!open && target?.action === 'open') { label = '접속'; mode = 'ready'; }
+    else if (!open && target?.action === 'open') { label = '기록 열기'; mode = 'ready'; }
+    else if (!open && target?.action === 'cleanse') { label = '정화'; mode = 'repair'; }
     else if (!open && target?.action === 'repair') { label = '수리'; mode = 'repair'; }
     const key = `${label}:${mode}`;
     if (key === last) return;

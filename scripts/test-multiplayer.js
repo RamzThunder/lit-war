@@ -80,9 +80,9 @@ try {
   a.send({ type: 'raid' });
   const raid = await a.wait('raid'); assert.equal(raid.opponent.name, '학생B');
   assert.equal((await b.wait('raid')).role, 'defender');
-  b.send({ type: 'move', x: 480, y: map.entry.y - 44, direction: 'down', moving: false });
+  b.send({ type: 'move', x: map.entry.x, y: map.entry.y - 44, direction: 'down', moving: false });
   await a.wait('peer'); await delay(400);
-  a.send({ type: 'move', x: 480, y: map.entry.y - 24, direction: 'up', moving: true }); await b.wait('peer');
+  a.send({ type: 'move', x: map.entry.x, y: map.entry.y - 24, direction: 'up', moving: true }); await b.wait('peer');
   a.send({ type: 'shock' });
   assert.equal((await b.wait('shock')).shocks, 1);
   assert.equal((await a.wait('shock')).shocks, 1);

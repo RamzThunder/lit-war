@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { map } from '../prototype/map.js';
 import { createTextures } from '../prototype/assets/createTextures.js';
-import { drawArchive, drawSabotages } from '../prototype/scenes/drawArchive.js';
+import { drawArchive, drawSabotages, preloadArchive } from '../prototype/scenes/drawArchive.js';
 // Read-only view of one live raid: the defender's archive, both players, shocks.
 // Loaded lazily by the teacher page so Phaser is only fetched once a raid happens.
 const TEAM_TINT = { blue: 0x8fc3ff, red: 0xff9a8f };
@@ -9,6 +9,7 @@ const ROLE_ICON = { attacker: '⚡', defender: '🏃' };
 
 class Spectator extends Phaser.Scene {
   constructor(onReady) { super('Spectator'); this.onReady = onReady; }
+  preload() { preloadArchive(this); }
   create() {
     createTextures(this);
     drawArchive(this);

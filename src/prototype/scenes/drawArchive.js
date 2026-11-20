@@ -1,46 +1,78 @@
-import { map, terminalSolid, doorFor, terminalFor } from '../map.js';
-// Static archive art shared by the student scene and the teacher's raid spectator.
-// `solid` receives each blocking rectangle (the student scene turns them into physics zones).
+import { map, solids, doorFor, terminalFor } from '../map.js';
+import serverCabinet from '../assets/server-cabinet.webp';
+import serviceDoor from '../assets/service-door.webp';
+import driveCase from '../assets/drive-case.webp';
+
+import serverFloor from '../assets/server-floor.webp';
+import archiveGlass from '../assets/archive-glass.webp';
+import archiveWalls from '../assets/archive-walls.webp';
+import restorationConsole from '../assets/restoration-console.webp';
+
+export function preloadArchive(scene) {
+  scene.load.image('server-floor', serverFloor);
+  scene.load.image('archive-glass', archiveGlass);
+  scene.load.image('archive-walls', archiveWalls);
+  scene.load.image('restoration-console', restorationConsole);
+  scene.load.image('server-cabinet', serverCabinet);
+  scene.load.image('service-door', serviceDoor);
+  scene.load.image('drive-case', driveCase);
+}
+
 export function drawArchive(scene, solid = () => {}) {
-  scene.add.tileSprite(0, 0, map.width, map.height, 'floor').setOrigin(0);
-  const g = scene.add.graphics();
-  const r = (x, y, w, h, c, a = 1) => g.fillStyle(c, a).fillRect(x, y, w, h);
-  map.walls.forEach(w => { r(w.x, w.y, w.width, w.height, 0x101a25); r(w.x, w.y, w.width, 3, 0x2a3b48); solid(w); });
-  r(24, 12, 912, 30, 0x263745); r(24, 45, 912, 4, 0x344c5b); r(24, 60, 912, 4, 0x080f18);
-  for (let x = 48; x < 920; x += 112) { r(x, 22, 60, 4, 0x75c3c8); r(x, 26, 60, 20, 0x6ad4d3, .04); }
-  // Hall floor guidance and doorway thresholds.
-  for (let y = 240; y < map.height - 80; y += 278) r(344, y, 272, 2, 0x38505a);
-  for (const d of map.doors) { r(d.x - 4, d.y - 4, d.width + 8, 4, 0x4d6b74); r(d.x - 4, d.y + d.height, d.width + 8, 4, 0x4d6b74); r(d.x, d.y, d.width, d.height, 0x1d2d38); }
+  const prop = (box, key) => scene.add.image(box.x, box.y, key).setOrigin(0).setDisplaySize(box.width, box.height);
+  const mid = map.spawn.x;
+  scene.add.image(0, 0, 'server-floor').setOrigin(0).setDisplaySize(map.width, map.height).setDepth(-2);
+  scene.add.image(0, 0, 'archive-walls').setOrigin(0).setDisplaySize(map.width, map.height);
+  const mount = scene.add.graphics();
+  function contactShadow(x, y, width) {
+    mount.fillStyle(0x11191b, .15).fillEllipse(x + 1, y, width + 3, 7);
+    mount.fillStyle(0x0c1214, .34).fillEllipse(x, y - 1, width - 4, 4);
+  }
   for (const o of map.racks) {
-    r(o.x - 6, o.y + 10, o.width + 12, o.height + 4, 0x080f17, .65);
-    r(o.x - 4, o.y - 4, o.width + 8, o.height + 8, 0x2a414d);
-    r(o.x, o.y, o.width, o.height, 0x0e1722); r(o.x, o.y, o.width, 8, 0x3c5361);
-    for (let row = 0; row < 5; row++) {
-      const y = o.y + 14 + row * 18;
-      r(o.x + 4, y, 48, 14, 0x22333f); r(o.x + 8, y + 3, 25, 2, 0x101b26); r(o.x + 8, y + 8, 25, 2, 0x14232e);
-      r(o.x + 41, y + 4, 3, 3, row === 3 ? 0xc4a06a : 0x6ad5c6); r(o.x + 47, y + 4, 2, 3, 0x3f797b);
-    }
-    solid(o);
+    contactShadow(o.x + o.width / 2, o.y + o.height - 1, o.width);
+    prop(o, 'server-cabinet');
   }
   for (const o of map.crates) {
-    r(o.x + 4, o.y + 5, o.width, o.height, 0x0b151e);
-    r(o.x, o.y, o.width, o.height, 0x36414a); r(o.x + 3, o.y + 3, o.width - 6, o.height - 6, 0x26333c);
-    r(o.x + 8, o.y, 4, o.height, 0x52616a); r(o.x + o.width - 12, o.y, 4, o.height, 0x52616a); solid(o);
+    contactShadow(o.x + o.width / 2, o.y + o.height - 1, o.width);
+    prop(o, 'drive-case');
   }
-  const label = (x, y, text, size = 10, color = '#69838c') => scene.add.text(x, y, text, { fontFamily: 'monospace', fontSize: size, color }).setOrigin(.5);
-  for (const t of map.terminals) {
-    r(t.x - 48, t.y - 38, 96, 88, 0x51d6c3, .035);
-    r(t.x - 36, t.y - 26, 72, 52, 0x0a141e); r(t.x - 32, t.y - 24, 64, 38, 0x475e67);
-    r(t.x - 27, t.y - 20, 54, 25, 0x112c36); r(t.x - 24, t.y - 17, 48, 19, 0x53bfaf);
-    r(t.x - 20, t.y - 13, 30, 2, 0x173b40); r(t.x - 20, t.y - 8, 22, 2, 0x28615d);
-    r(t.x - 32, t.y + 14, 64, 10, 0x283d48);
-    for (let x = -24; x < 20; x += 6) r(t.x + x, t.y + 16, 4, 2, 0x819c9e);
-    solid(terminalSolid(t));
-    label(t.x, t.y - 54, `ARCHIVE / ${t.era}`, 14, '#8aa9ad');
-    label(t.x, t.y - 38, `${t.era}년대 기록실`, 9, '#77c3b8');
+
+  for (const [i, t] of map.terminals.entries()) {
+    const d = doorFor(t.era);
+    const northWall = map.walls.find(w => w.width > w.height &&
+      w.x <= t.x && t.x < w.x + w.width && w.y + w.height <= t.y &&
+      t.y - (w.y + w.height) < 90);
+    const base = northWall.y + northWall.height;
+    // Mount the insert on the room-facing rack rail, clear of the doorway.
+    const signX = d.x < mid ? d.x - 23 : d.x + d.width + 23;
+    const signY = base - 11;
+    scene.add.rectangle(signX, signY, 41, 13, 0x141e23).setStrokeStyle(0.6, 0x546568);
+    scene.add.text(signX, signY, t.era + '년대', {
+      fontFamily: 'sans-serif', fontSize: '9px', color: '#b9d5cd', resolution: 4,
+    }).setOrigin(.5);
+
+    // The raised floor carries the feed; only the short lead at the inlet is exposed.
+    const inlet = t.x + (t.x < mid ? -18 : 18);
+    mount.lineStyle(1.5, 0x242d30, .8).beginPath()
+      .moveTo(inlet - 3, t.y - 21).lineTo(inlet, t.y - 20).lineTo(inlet + 1, t.y - 16).strokePath();
+    contactShadow(t.x, t.y + t.height / 2 - 1, t.width);
+    scene.add.image(t.x, t.y, 'restoration-console').setDisplaySize(t.width, t.height);
+    const scan = scene.add.rectangle(t.x, t.y - 14, 38, 1, 0x9ed7c5, .65);
+    scene.tweens.add({ targets: scan, y: t.y - 1, duration: 1300, delay: i * 220, repeatDelay: 2900, repeat: -1 });
   }
-  label(480, 580, 'ARCHIVE HUB', 16, '#8aa9ad'); label(480, 598, 'LITERATURE DATA STORAGE', 8);
-  label(480, 1130, 'SERVICE HATCH', 8, '#5d7680');
+  const panelY = map.spawn.y - 24;
+  scene.add.image(mid, panelY, 'archive-glass').setDisplaySize(64, 64);
+  scene.add.text(mid, panelY + 26, 'HUMAN · 중앙 기록보존소', {
+    fontFamily: 'sans-serif', fontSize: 5, color: '#aaaead', resolution: 4,
+    shadow: { offsetY: -0.5, color: '#161c1e', fill: true },
+  }).setOrigin(.5);
+  // Recess the door into the south wall at the end of the cable trench.
+  const doorX = map.entry.x;
+  scene.add.image(doorX, map.height, 'service-door').setOrigin(.5, 1).setDisplaySize(128, 36);
+  scene.add.text(doorX + 54, map.height - 18, '남측\n정비구', {
+    fontFamily: 'sans-serif', fontSize: 3.8, align: 'center', resolution: 4, color: '#c9c8bb',
+  }).setOrigin(.5);
+  solids.forEach(solid);
 }
 // Barricades and broken terminals of the room on screen. Returns the created labels;
 // `onBarricade` receives each barricaded door rectangle.

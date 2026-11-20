@@ -140,22 +140,22 @@ test('live raid: positions relayed only between the pair, shock range/cooldown/s
   assert.equal(room.me('a').raidRights, 0);
   assert.ok(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }, 1001), 'error'), 'no terminals during raid');
   // Defender syncs its position with the first move; attacker walks up from the entry.
-  room.command(defenderId, { type: 'move', x: 480, y: map.entry.y - 44, direction: 'down', moving: false }, 1100);
+  room.command(defenderId, { type: 'move', x: map.entry.x, y: map.entry.y - 44, direction: 'down', moving: false }, 1100);
   assert.equal(data(room.command('a', { type: 'shock' }, 1100), 'shock-miss').reason.includes('가까이'), true);
-  const step = room.command('a', { type: 'move', x: 480, y: map.entry.y - 24, direction: 'up', moving: true }, 1300);
+  const step = room.command('a', { type: 'move', x: map.entry.x, y: map.entry.y - 24, direction: 'up', moving: true }, 1300);
   assert.equal(step[0].to, defenderId, 'move relayed to the defender only');
-  assert.equal(data(room.command('a', { type: 'move', x: 480, y: 100, direction: 'up', moving: true }, 1350), 'correction').player.y, map.entry.y - 24);
+  assert.equal(data(room.command('a', { type: 'move', x: map.entry.x, y: 100, direction: 'up', moving: true }, 1350), 'correction').player.y, map.entry.y - 24);
   const shock = room.command('a', { type: 'shock' }, 1400);
   assert.equal(data(shock, 'shock', defenderId).shocks, 1);
   assert.equal(data(shock, 'shock', defenderId).stolen, 5);
-  assert.ok(data(room.command(defenderId, { type: 'move', x: 480, y: map.entry.y - 64, direction: 'up', moving: true }, 1500), 'correction'), 'stunned');
+  assert.ok(data(room.command(defenderId, { type: 'move', x: map.entry.x, y: map.entry.y - 64, direction: 'up', moving: true }, 1500), 'correction'), 'stunned');
   assert.equal(data(room.command('a', { type: 'shock' }, 2500), 'shock-miss').reason.includes('감전되지'), true, 'invulnerable right after stun');
   assert.equal(data(room.command('a', { type: 'shock' }, 4000), 'shock', 'a').shocks, 2);
   const blue = room.scores['1950'][a.profile.team]; assert.equal(blue, 10);
   assert.deepEqual(room.tick(15999), []);
   const end = room.tick(16000);
   assert.equal(data(end, 'raid-end', 'a').shocks, 2); assert.equal(data(end, 'raid-end', defenderId).stolen, 10);
-  assert.deepEqual(room.command('a', { type: 'move', x: 480, y: map.entry.y - 44, direction: 'up', moving: true }, 16100), []);
+  assert.deepEqual(room.command('a', { type: 'move', x: map.entry.x, y: map.entry.y - 44, direction: 'up', moving: true }, 16100), []);
 });
 test('raid without a free target keeps the right; disconnect ends the raid for the partner', () => {
   const room = new RoomEngine({}, () => 0);
@@ -235,7 +235,7 @@ test('teachers spectate live raids: start snapshot, moves, shocks, end, and mid-
   assert.equal(watch.attacker.name, 'A'); assert.equal(watch.left, RULES.raidMs);
   assert.deepEqual({ x: watch.attacker.player.x, y: watch.attacker.player.y }, map.entry);
   const defender = start.find(o => o.data.role === 'defender').to;
-  const move = room.command(defender, { type: 'move', x: 480, y: map.entry.y - 30, direction: 'down', moving: false }, 2100);
+  const move = room.command(defender, { type: 'move', x: map.entry.x, y: map.entry.y - 30, direction: 'down', moving: false }, 2100);
   assert.equal(data(move, 'watch-move', 't').role, 'defender');
   assert.equal(room.teacherWelcome(2200).raids[0].defender.player.y, map.entry.y - 30, 'a teacher joining mid-raid sees positions');
   const shock = room.command('a', { type: 'shock' }, 2600);

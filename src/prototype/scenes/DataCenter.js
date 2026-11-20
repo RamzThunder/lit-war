@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import { map, movementVector, nearestTerminal, isNearDoor, terminalSolid, doorFor, terminalFor } from '../map.js';
-import { createTextures } from '../assets/createTextures.js';
-import { drawArchive, drawSabotages } from './drawArchive.js';
+import { characterAnimation, createTextures, preloadCharacters } from '../assets/createTextures.js';
+import { drawArchive, drawSabotages, preloadArchive } from './drawArchive.js';
 const SHOCK_RANGE = 40;
-const TEAM_TINT = { blue: 0x8fc3ff, red: 0xff9a8f };
 export class DataCenter extends Phaser.Scene {
   constructor(state, updateContext, touch) { super('DataCenter'); this.state = state; this.updateContext = updateContext; this.touch = touch; this.direction = 'down'; }
+  preload() { preloadCharacters(this); preloadArchive(this); }
   create() {
     createTextures(this);
+    this.practiceTeam = new URLSearchParams(location.search).get('character') === 'luddite' ? 'red' : 'blue';
     this.solids = this.physics.add.staticGroup();
     drawArchive(this, ({ x, y, width, height }) => {
       const zone = this.add.zone(x + width / 2, y + height / 2, width, height);
@@ -76,7 +77,7 @@ export class DataCenter extends Phaser.Scene {
     this.tweens.add({ targets: bolt, y: target.y - 52, alpha: 0, duration: 900, onComplete: () => bolt.destroy() });
     let flashes = 0;
     const timer = this.time.addEvent({ delay: 90, repeat: 9, callback: () => { flashes++; target.setTint(flashes % 2 ? 0xfff27a : 0xffffff); if (flashes === 10) target.clearTint?.(); } });
-    this.time.delayedCall(1000, () => { timer.remove(); if (target.active) (target === this.player ? target.clearTint() : target.setTint(TEAM_TINT[this.state.raid?.opponent.team] ?? 0x94c9ed)); });
+    this.time.delayedCall(1000, () => { timer.remove(); if (target.active) target.clearTint(); });
   }
   // What the E key would do here: open a terminal, or repair a sabotage.
   target() {
@@ -135,9 +136,9 @@ export class DataCenter extends Phaser.Scene {
     if (stick) { const length = Math.hypot(this.touch.x, this.touch.y); v = { x: this.touch.x / length * 130, y: this.touch.y / length * 130 }; }
     this.player.setVelocity(v.x, v.y);
     if (v.x || v.y) this.direction = Math.abs(v.x) >= Math.abs(v.y) ? (v.x < 0 ? 'left' : 'right') : (v.y < 0 ? 'up' : 'down');
-    this.player.anims.play(`${v.x || v.y ? 'walk' : 'idle'}-${this.direction}`, true);
     const team = this.state.me?.team;
-    this.nameLabel.setPosition(this.player.x, this.player.y - 25).setText(this.state.online ? `${this.state.name} (나)` : '나');
+    this.player.anims.play(characterAnimation(this.state.online ? team : this.practiceTeam, this.direction, v.x || v.y), true);
+    this.nameLabel.setVisible(Boolean(this.state.online)).setPosition(this.player.x, this.player.y - 25).setText(this.state.online ? `${this.state.name} (나)` : '나');
     this.nameLabel.setColor(team === 'red' ? '#ffc9c2' : team === 'blue' ? '#cfe4ff' : '#d7fff0');
     // Positions travel only during a live raid, at most 10 Hz and only when changed.
     if (raid && this.state.connected && time - this.lastSentAt >= 100) {
@@ -149,7 +150,7 @@ export class DataCenter extends Phaser.Scene {
     const peer = raid?.opponent;
     if (peer && !this.opponent) {
       this.opponent = {
-        sprite: this.add.sprite(peer.x ?? map.entry.x, peer.y ?? map.entry.y, 'player-down-0').setTint(TEAM_TINT[peer.team] ?? 0x94c9ed).setDepth(9).setVisible(peer.x != null),
+        sprite: this.add.sprite(peer.x ?? map.entry.x, peer.y ?? map.entry.y, 'player-down-0').setDepth(9).setVisible(peer.x != null),
         label: this.add.text(0, 0, `${raid.role === 'attacker' ? '🎯' : '⚡'} ${peer.name}`, { fontSize: '9px', fontFamily: 'sans-serif', color: '#ffe0a8', backgroundColor: '#2a1d10' }).setOrigin(.5).setDepth(20).setVisible(peer.x != null),
       };
     }
@@ -159,7 +160,7 @@ export class DataCenter extends Phaser.Scene {
       const alpha = 1 - Math.exp(-delta / 65);
       sprite.x += (peer.x - sprite.x) * alpha; sprite.y += (peer.y - sprite.y) * alpha;
       const moving = peer.moving && performance.now() - (peer.receivedAt ?? 0) < 600;
-      sprite.anims.play(`${moving ? 'walk' : 'idle'}-${peer.direction ?? 'down'}`, true);
+      sprite.anims.play(characterAnimation(peer.team, peer.direction ?? 'down', moving), true);
       label.setPosition(sprite.x, sprite.y - 25);
     }
     const target = this.target();
