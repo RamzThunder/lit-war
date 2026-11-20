@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TV · 진행 중 (v2)</title>
+<link rel="stylesheet" href="system.css">
+<style>
+body{width:1920px;height:1080px;overflow:hidden}
+.screen{height:100%;padding:44px 72px 56px;display:grid;grid-template-rows:auto auto auto 1fr;row-gap:30px}
+.sysline{font-size:24px;justify-content:space-between}
+.sysline .join{display:flex;align-items:center;gap:18px;color:var(--muted)}
+.sysline .join .sys{font-size:32px;color:var(--text);letter-spacing:.18em}
+.mini-qr{width:64px;height:64px;background:#fff;padding:5px;border-radius:6px}
+/* 큰 숫자 세 개: 보존관 점수 · 남은 시간 · 러다이트 점수 (Claude) + 보조 문구 (GPT) */
+.hero{display:grid;grid-template-columns:1fr auto 1fr;align-items:end}
+.team .sys{display:block;font-size:128px;line-height:.85}
+.team .name{display:block;font-size:32px;font-weight:700;margin-top:18px}
+.team.blue .name{color:var(--blue)} .team.red .name{color:var(--red)}
+.team small{display:block;font-size:24px;color:var(--muted);font-weight:400;margin-top:6px}
+.team.red{text-align:right}
+.clock{text-align:center;padding:0 40px}
+.clock .sys{font-size:112px;line-height:.85;letter-spacing:.06em}
+.clock .state{display:block;margin-top:18px;font-size:24px;color:var(--muted)}
+.tugwrap{display:grid;row-gap:12px}
+.tug{position:relative;height:12px;border-radius:6px;overflow:hidden;display:flex;background:var(--red)}
+.tug i{width:53.4%;background:var(--blue)}
+.tug::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;background:var(--bg)}
+.lead{text-align:center;font-size:26px;color:var(--muted)} .lead b{color:var(--blue);font-weight:700}
+.lower{display:grid;grid-template-columns:1fr 560px;column-gap:56px;min-height:0}
+h2{display:flex;justify-content:space-between;align-items:baseline;font-size:24px;font-weight:600;color:var(--muted);margin-bottom:18px}
+h2 .legend{display:flex;gap:20px;font-size:24px;font-weight:400}
+.map{display:flex;flex-direction:column;min-height:0}
+.eras{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;gap:16px}
+.era{padding:24px 26px 24px 32px;gap:6px}
+.era .yr{font-size:48px;line-height:1}
+.era .owner{font-size:24px;margin-top:4px}
+.era .split{margin-top:auto}
+.era .nums{display:flex;justify-content:space-between;font-size:28px;margin-top:12px}
+.era .flags{top:22px;right:22px}
+.era .flag{font-size:20px;padding:4px 12px}
+.side{display:flex;flex-direction:column;min-height:0}
+.alertband{display:flex;align-items:center;justify-content:space-between;padding:22px 28px;margin-bottom:30px}
+.alertband b{font-size:30px;color:var(--alert)} .alertband p{font-size:24px;color:#efe2b8;margin-top:4px}
+.alertband .sys{font-size:56px;color:var(--alert)}
+.log{gap:20px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent)}
+.log li{font-size:26px;line-height:1.35}
+.log time{font-size:24px}
+.log .detail{font-size:24px}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="sysline">
+    <span><b>HUMAN ARCHIVE NET</b> · SECTOR 03 · 현대문학 기록 보관소 &nbsp; <span class="dot live"></span> LIVE 14:21:08</span>
+    <span class="join">늦게 왔다면 <span class="sys">AH7FHG</span><span class="mini-qr" id="qr"></span></span>
+  </div>
+  <section class="hero">
+    <div class="team blue"><span class="sys c-blue">300</span><span class="name">인류유산 보존관</span><small>14명 접속 · 4개 시대 점령</small></div>
+    <div class="clock"><span class="sys">17:42</span><span class="state"><span class="dot live"></span> 진행 중 · 남은 시간</span></div>
+    <div class="team red"><span class="sys c-red">262</span><span class="name">러다이트</span><small>3개 시대 점령 · 14명 접속</small></div>
+  </section>
+  <div class="tugwrap"><div class="tug"><i></i></div><div class="lead"><b>보존관 우세 +38</b> · 점령 4 : 3</div></div>
+  <section class="lower">
+    <div class="map">
+      <h2>기록 보관소 지도 <span class="legend"><span><span class="c-alert">●</span> 접전 = 10점 이내</span></span></h2>
+      <div class="eras" id="eras"></div>
+    </div>
+    <div class="side">
+      <div class="alertband"><div><b>⚠ 오염 경보</b><p>미끼 심기 · 정화 점수 2배</p></div><span class="sys">0:41</span></div>
+      <h2>관제 로그</h2>
+      <ol class="log" id="feed"></ol>
+    </div>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+<script src="data.js"></script>
+<script>D.renderEras(eras); D.renderFeed(feed, 5); D.renderQR(qr);</script>
+</body>
+</html>

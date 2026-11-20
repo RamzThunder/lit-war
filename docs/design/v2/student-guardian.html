@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>학생 · 보존관 (v2)</title>
+<link rel="stylesheet" href="system.css">
+<link rel="stylesheet" href="student.css">
+</head>
+<body class="guardian">
+<div class="screen">
+  <div class="top">
+    <div class="who"><span class="mark">HUMAN</span><span>공식 기록 단말기</span><span class="badge">인류유산 보존관</span></div>
+    <div class="clock"><span class="sys">17:42</span><span><span class="dot live" style="background:var(--side)"></span> 진행 중</span></div>
+    <div class="net"><span>방 <span class="sys">AH7FHG</span></span><span>28명 접속</span><span><span class="dot on" style="background:var(--side)"></span> 연결됨</span></div>
+  </div>
+  <div class="game">
+    <img src="game.png" alt="">
+    <div class="chip room"><b>서연</b>의 기록실 · 섹터 03</div>
+    <div class="chip event alert"><b>⚠ 오염 경보</b><span class="sys">0:41</span><small>오염된 단말기를 찾아 정화하면 +20</small></div>
+    <div class="chip toast">✨ 1920년대 기록 복원 · 보존관 +10</div>
+    <div class="chip map" id="map"></div>
+    <div class="chip prompt"><kbd>E</kbd> 1930년대 기록 열기</div>
+  </div>
+  <div class="hud">
+    <div class="missions"><span class="sys">23</span><div><small>미션 · 다음 공격권까지 2개</small><div class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div></div>
+    <div class="actions">
+      <button class="btn">🚧 바리케이드 <span class="n">1</span><kbd>1</kbd></button>
+      <button class="btn" disabled>⚡ 실시간 공격 <span class="n">0</span><kbd>2</kbd><kbd>2</kbd></button>
+      <button class="btn">🪤 함정 <span class="n">1930</span><kbd>3</kbd></button>
+    </div>
+    <div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동</span><span><kbd>E</kbd> 열기</span><span><kbd>SPACE</kbd> 감전</span><span><kbd>ESC</kbd> 닫기</span></div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+const own = (b, r) => ({ blue: 'b', red: 'r' })[D.owner(b, r)] ?? '';
+const { blue, red } = D.totals();
+map.innerHTML = `<span class="t"><span>점령 현황</span><span><span class="c-blue">${blue}</span> : <span class="c-red">${red}</span></span></span>` + D.ERAS.map(([y, b, r]) => `<i class="${own(b, r)} ${D.CONTAM.has(y) ? 'c' : ''} ${D.isClose(b, r) ? 'k' : ''}">${y.slice(2)}</i>`).join('');
+</script>
+</body>
+</html>

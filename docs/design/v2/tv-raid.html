@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TV · 실시간 공격 중계 (v2)</title>
+<link rel="stylesheet" href="system.css">
+<style>
+body{width:1920px;height:1080px;overflow:hidden}
+.screen{height:100%;padding:40px 72px 56px;display:grid;grid-template-rows:auto auto 1fr;row-gap:26px}
+/* 평소 전황은 한 줄로 접는다 */
+.strip{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;column-gap:28px;font-size:24px;color:var(--muted)}
+.strip .sys{font-size:48px;line-height:1}
+.strip .bar{height:8px;border-radius:4px;display:flex;overflow:hidden;background:var(--red)}.strip .bar i{width:53.4%;background:var(--blue)}
+/* 한 줄 제목 (Gemini) */
+.headline{display:flex;align-items:center;gap:22px;font-size:44px;font-weight:800;letter-spacing:-.01em}
+.headline .tag{font-family:var(--sys);font-size:24px;font-weight:700;color:var(--red);padding:6px 14px;border-radius:8px;background:var(--red-dim)}
+.headline .arrow{color:var(--faint);font-weight:400;font-size:32px}
+.headline small{font-size:28px;font-weight:600;color:var(--muted)}
+.main{display:grid;grid-template-columns:1fr 500px;column-gap:44px;min-height:0}
+/* 실제 게임 중계 화면 (Claude): 교사 화면의 Phaser 중계를 그대로 쓴다 */
+.stage{position:relative;border-radius:var(--r);overflow:hidden;background:#000}
+.stage img{width:100%;height:100%;object-fit:cover;object-position:50% 40%;image-rendering:pixelated}
+.marker{position:absolute;width:36px;height:52px;transform:translate(-50%,-50%);border:3px dashed var(--red);border-radius:6px}
+.mtag{position:absolute;font-size:24px;font-weight:700;padding:6px 12px;border-radius:8px;background:#000c;transform:translate(-50%,-100%);color:var(--red);box-shadow:inset 0 0 0 2px var(--red)}
+.side{display:flex;flex-direction:column;gap:30px}
+.count .sys{font-size:200px;line-height:.85}
+.count>span:last-child{display:block;font-size:24px;color:var(--muted);margin-top:12px}
+.shocks{display:flex;gap:12px}
+.shocks i{flex:1;height:18px;border-radius:4px;background:var(--surface)}
+.shocks i.on{background:var(--red)}
+.label{font-size:24px;color:var(--muted);margin-top:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stats div{background:var(--surface);border-radius:var(--r);padding:20px 24px}
+.stats span{display:block;font-size:24px;color:var(--muted)}
+.stats b{display:block;margin-top:4px}
+/* 끝나면 같은 자리에 결과 카드 (GPT) — 시안은 미리보기로 흐리게 */
+.result{border-radius:var(--r);padding:20px 24px;background:var(--red-dim);box-shadow:inset 0 0 0 2px var(--red);font-size:30px;font-weight:800;text-align:center;opacity:.45}
+.result small{display:block;font-size:24px;font-weight:500;color:var(--muted);margin-top:4px}
+.queue{font-size:24px;color:var(--muted);margin-top:auto}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="strip"><span>남은 시간 <span class="sys" style="color:var(--text);margin-left:12px">17:42</span></span><span class="sys c-blue" style="margin-left:40px">300</span><span class="bar"><i></i></span><span class="sys c-red">262</span></div>
+  <div class="headline"><span class="tag"><span class="dot live" style="background:var(--red)"></span> 실시간 공격</span><span class="c-red">[러다이트] 민준</span><span class="arrow">▶ 침입 ▶</span><span class="c-blue">[보존관] 서연</span><small>의 기록실</small></div>
+  <section class="main">
+    <div class="stage">
+      <img src="game.png" alt="">
+      <span class="marker" style="left:59%;top:74%"></span>
+      <span class="mtag" style="left:59%;top:69%">민준</span>
+    </div>
+    <div class="side">
+      <div class="count"><span class="sys">09</span><span>남은 초</span></div>
+      <div><div class="shocks"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><p class="label">감전 3 / 5 · 한 번에 5점씩 빼앗아요</p></div>
+      <div class="stats"><div><span>빼앗긴 점수</span><b class="sys c-red" style="font-size:48px">15</b></div><div><span>서연</span><b style="font-size:36px;font-weight:800">도망치는 중</b></div></div>
+      <div class="result">끝나면 → 민준 승! 15점 탈취<small>또는 서연 완벽 회피!</small></div>
+      <p class="queue">다음 중계 대기 1건 · 도윤 → 하은</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>

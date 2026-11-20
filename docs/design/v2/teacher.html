@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>교사용 · 진행 중 (v2)</title>
+<link rel="stylesheet" href="system.css">
+<style>
+body{width:1440px;height:900px;overflow:hidden;font-size:14px}
+.screen{height:100%;display:grid;grid-template-rows:52px 1fr}
+header{display:flex;align-items:center;gap:18px;padding:0 24px;border-bottom:1px solid var(--line)}
+header .brand{font-family:var(--sys);font-weight:700;font-size:16px}
+header .title{color:var(--muted)}
+header .hright{margin-left:auto;display:flex;align-items:center;gap:16px;color:var(--muted)}
+.btn{font-size:14px}
+/* GPT 구조: 왼쪽 조작 열 · 가운데 명단 · 오른쪽 사건 열 */
+.body{display:grid;grid-template-columns:272px 1fr 360px;min-height:0}
+.col{padding:18px 20px;display:flex;flex-direction:column;gap:18px;min-height:0}
+.col+.col{border-left:1px solid var(--line)}
+h3{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px}
+h3 em{font-style:normal;color:var(--faint);font-weight:400}
+.card{background:var(--surface);border-radius:var(--r);padding:16px}
+
+/* 왼쪽: 상태와 지금 누를 수 있는 버튼만 (위치는 늘 같음) */
+.state .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--raised)}
+.state .sys{display:block;font-size:48px;line-height:1;margin:12px 0 10px}
+.progress{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.progress i{display:block;width:41%;height:100%;background:var(--text)}
+.state p{font-size:12px;color:var(--muted);margin-top:8px}
+.controls{display:flex;flex-direction:column;gap:8px}
+.controls .btn{justify-content:flex-start;width:100%}
+.controls .btn.alert{background:var(--alert-dim);color:var(--alert)}
+.controls hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.controls .row{display:flex;gap:8px}.controls .row .btn{flex:1;justify-content:center}
+.note{font-size:12px;color:var(--faint);line-height:1.5}
+.entry{display:flex;gap:12px;align-items:center}
+.entry .qr{width:64px;height:64px;background:#fff;padding:4px;border-radius:6px;flex:none}
+.entry .sys{font-size:20px;letter-spacing:.14em}
+.entry div>span:last-child{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+
+/* 가운데: 점수 · 시대 · 명단 */
+.score{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:14px}
+.score .sys{font-size:30px}
+.score .bar{height:6px;border-radius:3px;overflow:hidden;display:flex;background:var(--red)}.score .bar i{width:53.4%;background:var(--blue)}
+.score small{grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;margin-top:6px}
+.eras{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.era{padding:9px 8px 9px 12px;gap:2px}
+.era::before{width:4px}
+.era .yr{font-size:15px}
+.era .owner{font-size:11px}
+.era .split{margin-top:6px;height:3px}
+.era .nums{display:flex;justify-content:space-between;font-size:12px;margin-top:4px}
+.era .flags{top:7px;right:6px;gap:3px}
+.era .flag{font-size:0;width:9px;height:9px;padding:0}
+.roster{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;min-height:0}
+.roster h3 b{font-weight:700}
+.roster h3.blue b{color:var(--blue)} .roster h3.red b{color:var(--red)}
+.roster ul{list-style:none}
+.roster li{display:grid;grid-template-columns:10px 1fr auto 28px 22px;align-items:center;column-gap:8px;height:31px;padding:0 8px;border-radius:6px}
+.roster li:nth-child(odd){background:var(--surface)}
+.roster li.off{color:var(--faint)} .roster li.off .st{color:var(--faint)}
+.roster .m{font-family:var(--sys);color:var(--muted);font-size:13px;text-align:right}
+.roster .st{font-size:12px;color:var(--text)}
+.roster .more{color:var(--faint);text-align:center;letter-spacing:1px}
+.rhead{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted)}
+.rhead b{color:var(--text)}
+
+/* 오른쪽: 사건 */
+.raid .tabs{display:flex;gap:6px;margin-bottom:10px}
+.raid .tabs span{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--raised);color:var(--muted)}
+.raid .tabs span.on{background:var(--text);color:var(--bg)}
+.raid .view{height:150px;border-radius:8px;overflow:hidden}
+.raid .view img{width:100%;height:100%;object-fit:cover;object-position:50% 45%;image-rendering:pixelated}
+.raid .info{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.raid .info .sys{font-size:22px}
+.contam{list-style:none;display:flex;flex-direction:column;gap:8px}
+.contam li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px;line-height:1.45;padding:8px 10px;border-radius:8px;background:var(--surface)}
+.contam s{color:var(--alert)} .contam .who{color:var(--faint);font-size:12px}
+.contam .ok{font-size:12px;text-align:right;color:var(--muted)} .contam .wait{color:var(--alert)}
+.log{gap:10px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.log li{font-size:13px;line-height:1.4}
+.log time{font-size:11px}
+.log .detail{font-size:12px}
+</style>
+</head>
+<body>
+<div class="screen">
+  <header>
+    <span class="brand">2030<span class="muted">_</span></span><span class="title">수업 관제 콘솔</span>
+    <span class="hright"><span><span class="dot live"></span> 서버 연결됨</span><button class="btn">📺 TV 화면 열기 ↗</button></span>
+  </header>
+  <section class="body">
+    <aside class="col">
+      <div class="card state"><span class="pill"><span class="dot live"></span> 진행 중</span><span class="sys">17:42</span><div class="progress"><i></i></div><p>30분 수업 · 12:18 지남</p></div>
+      <div>
+        <h3>진행 조작</h3>
+        <div class="controls">
+          <button class="btn">⏸ 잠시 멈춤</button>
+          <button class="btn alert">⚠ 오염 경보 발동 (1분)</button>
+          <hr>
+          <div class="row"><button class="btn danger">■ 종료</button><button class="btn ghost">↺ 초기화</button></div>
+        </div>
+        <p class="note" style="margin-top:10px">시작 전에는 같은 자리에 🎬 오프닝 재생 · ▶ 시작이 나와요.</p>
+      </div>
+      <div>
+        <h3>학생 입장 <em>늦게 온 학생용</em></h3>
+        <div class="entry"><div class="qr" id="qr"></div><div><span class="sys">AH7FHG</span><span>QR 크게 보기 · 코드 복사</span></div></div>
+      </div>
+      <p class="note" style="margin-top:auto">TV는 보기 전용 창이에요. 버튼이 없고 교사 화면과 같은 내용을 크게 보여 줘요.</p>
+    </aside>
+
+    <main class="col">
+      <div class="score"><span class="sys c-blue">300</span><span class="bar"><i></i></span><span class="sys c-red">262</span><small>보존관 우세 +38 · 점령 4 : 3</small></div>
+      <div class="eras" id="eras"></div>
+      <div>
+        <div class="rhead"><span><b>학생</b> · 가나다순 고정</span><span>접속 <b>26</b> / 28 · <b>끊김 2명</b></span></div>
+      </div>
+      <div class="roster" id="roster" style="margin-top:-8px"></div>
+    </main>
+
+    <aside class="col">
+      <div>
+        <h3>⚡ 실시간 공격 <em>2건</em></h3>
+        <div class="card raid">
+          <div class="tabs"><span class="on">민준 → 서연</span><span>도윤 → 하은</span></div>
+          <div class="view"><img src="game.png" alt=""></div>
+          <div class="info"><span>감전 <b>3</b>/5 · <span class="c-red">15점 탈취</span></span><span class="sys">0:09</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>🧪 오염 기록 <em>가짜 → 진짜</em></h3>
+        <ol class="contam">
+          <li><span>「동백꽃」 시대 <s>1950년대</s> → <b>1930년대</b></span><span class="ok wait">정화 대기</span><span class="who">지호 → 수아의 방</span></li>
+          <li><span>「서시」 작가 <s>이육사</s> → <b>윤동주</b></span><span class="ok">✓ 정화됨</span><span class="who">현우 → 하은의 방</span></li>
+        </ol>
+      </div>
+      <div style="min-height:0;display:flex;flex-direction:column">
+        <h3>관제 로그</h3>
+        <ol class="log" id="feed"></ol>
+      </div>
+    </aside>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+<script src="data.js"></script>
+<script>
+D.renderEras(eras, { compact: true }); D.renderFeed(feed); D.renderQR(qr);
+// 진행 중에는 가나다순으로 고정: 미션 수가 바뀌어도, 끊겨도 줄이 움직이지 않는다. 퇴장은 ⋯ 메뉴 안.
+roster.innerHTML = ['blue', 'red'].map(team => {
+  const list = D.ROSTER.filter(p => p.team === team).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return `<div><h3 class="${team}"><b>${team === 'blue' ? '인류유산 보존관' : '러다이트'}</b><em>접속 ${list.filter(p => p.online).length} / ${list.length}</em></h3><ul>${list.map(p => `<li class="${p.online ? '' : 'off'}"><span class="dot ${p.online ? 'on' : ''}"></span><span>${p.name}</span><span class="st">${!p.online ? '끊김' : p.raiding ? '⚡ 공격 중' : ''}</span><span class="m">${p.missions}</span><span class="more">${p.online ? '⋯' : ''}</span></li>`).join('')}</ul></div>`;
+}).join('');
+</script>
+</body>
+</html>
