@@ -71,12 +71,6 @@ def broadcast(play):
         for n,p in enumerate((72,76,79,84)):
             play(t+n*.09,'brass',p,.24,.085)
     play(68,'metal',43,.18,.20)
-    for t in range(71,121,4):
-        play(t,'fan',38,4,.19)
-    for t in (76,83,89,96,102,106,110,116):
-        play(t,'hiss',62,.07,.12)
-    for i,p in enumerate((60,67,72)):
-        play(121+i*.7,'brass',p,.8,.09)
 
 
 def invitation(play):
@@ -128,7 +122,26 @@ def render(folder, master, duration, cues):
         target=directory/(folder+'-sound.mp4')
         staged=directory/(folder+'-sound.tmp.mp4')
         try:
-            subprocess.run(['ffmpeg','-v','error','-y','-i',str(directory/(master+'.mp4')),'-i',str(sound),'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-ar','48000','-b:a','128k','-movflags','+faststart',str(staged)],check=True)
+            inputs = ['-i', str(directory/(master+'.mp4')), '-i', str(sound)]
+            audio = ['-map','1:a:0']
+            if folder.startswith('common'):
+                from luddite_band import THEME_FILE, THEME_START
+                inputs += ['-i', str(ROOT/'luddite-pixel-v12'/THEME_FILE)]
+                # Let the TV switch click through the downbeat. Stretch the tune
+                # without shifting its key, soften the attacks and add a short room tail.
+                filters = (
+                    f'[2:a]atrim=start={THEME_START}:duration=47,asetpts=PTS-STARTPTS,'
+                    'atempo=0.76,highpass=f=100,lowpass=f=2200,'
+                    'acompressor=threshold=0.10:ratio=3:attack=2:release=120,'
+                    'aecho=0.8:0.85:82:0.22,loudnorm=I=-26:TP=-4:LRA=7,'
+                    'aresample=48000,atrim=duration=60,afade=t=in:d=1.7,'
+                    'afade=t=out:st=57:d=3,adelay=68000:all=1[theme];'
+                    '[1:a][theme]amix=inputs=2:duration=first:normalize=0[out]'
+                )
+                audio = ['-filter_complex',filters,'-map','[out]']
+            subprocess.run(['ffmpeg','-v','error','-y',*inputs,'-map','0:v:0',*audio,
+                            '-c:v','copy','-c:a','aac','-ar','48000','-b:a','128k',
+                            '-movflags','+faststart',str(staged)],check=True)
             staged.replace(target)
         finally:
             staged.unlink(missing_ok=True)

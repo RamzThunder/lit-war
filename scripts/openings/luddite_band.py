@@ -68,8 +68,11 @@ def compose():
         note(ch,216,key,3.2,91)
     return sorted(events)
 
+THEME_FILE = "Square Wave Assault.mp3"
+THEME_START = 0.300
+
 def render(directory, master):
-    theme = directory / 'Final Stand.mp3'
+    theme = directory / THEME_FILE
     human = directory.parent / 'common-propaganda-v3/common-propaganda-v3-sound.mp4'
     target = directory / (directory.name + '-sound.mp4')
     transition = ';'.join([
@@ -78,7 +81,7 @@ def render(directory, master):
         'highpass=f=850,lowpass=f=6800,afade=t=in:d=0.32,'
         'afade=t=out:st=2.8:d=0.2,adelay=4000:all=1[hiss]',
         '[human][hiss]amix=inputs=2:normalize=0,atrim=duration=7[intro]',
-        '[1:a]atrim=start=0.125:duration=72,asetpts=PTS-STARTPTS,'
+        f'[1:a]atrim=start={THEME_START}:duration=72,asetpts=PTS-STARTPTS,'
         'aresample=48000,afade=t=out:st=70:d=2[theme]',
         '[intro][theme]concat=n=2:v=0:a=1,loudnorm=I=-17:TP=-1.5:LRA=9[out]',
     ])
