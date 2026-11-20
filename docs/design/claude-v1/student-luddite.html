@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>학생 · 러다이트</title>
+<link rel="stylesheet" href="system.css">
+<link rel="stylesheet" href="student.css">
+</head>
+<body class="luddite">
+<div class="screen">
+  <div class="top">
+    <div class="who"><span class="mark">[ 비인가 접속 ]</span><span>신호 우회 중</span><span class="badge">러다이트</span></div>
+    <div class="clock"><span class="sys">17:42</span><span><span class="dot live"></span> 진행 중</span></div>
+    <div class="net"><span>방 <span class="sys">AH7FHG</span></span><span>28명 접속</span><span><span class="dot on"></span> 연결됨</span></div>
+  </div>
+  <div class="game">
+    <img src="game.png" alt="">
+    <div class="chip room"><b>민준</b>의 은신 기록실 · 우회 노드 07</div>
+    <div class="chip map" id="map"></div>
+    <div class="chip toast">📡 1960년대 원본 확보 · 러다이트 +10</div>
+    <div class="chip prompt"><kbd>E</kbd> 1930년대 원본 빼내기</div>
+  </div>
+  <div class="hud">
+    <div class="missions"><span class="sys">20</span><div><small>미션 · 다음 방해 공작까지 5개</small><div class="pips"><i></i><i></i><i></i><i></i><i></i></div></div></div>
+    <div class="actions">
+      <button class="btn" style="visibility:hidden">🪤 함정</button>
+      <button class="btn">💥 방해 공작 <span class="n">1</span></button>
+      <button class="btn">⚡ 실시간 공격 <span class="n">1</span></button>
+    </div>
+    <div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동</span><span><kbd>E</kbd> 상호작용</span><span><kbd>SPACE</kbd> 감전</span></div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+const own = (b, r) => ({ blue: 'b', red: 'r' })[D.owner(b, r)] ?? '';
+map.innerHTML = '<span class="t"><span>점령 현황</span><span><span class="c-blue">340</span> : <span class="c-red">260</span></span></span>' + D.ERAS.map(([y, b, r]) => `<i class="${own(b, r)} ${D.CONTAM.has(y) ? 'c' : ''}">${y.slice(2)}</i>`).join('');
+</script>
+</body>
+</html>

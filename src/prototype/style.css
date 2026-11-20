@@ -40,3 +40,6 @@ body.touch #interaction{bottom:auto;top:62px}body.touch .game-caption,body.touch
 .opening-wait strong{font-size:clamp(26px,5vw,44px)}.opening.blue .opening-wait strong{color:#8fc3ff}.opening.red .opening-wait strong{color:#ff9a8f}
 .opening-wait p{font-size:16px;color:#a6bcc6}.opening-wait span{font:20px monospace;color:#86d8c0}
 .opening-loading{position:absolute;display:flex;flex-direction:column;align-items:center;gap:14px;width:min(420px,80vw)}.opening-loading strong{font-size:22px;color:#e6f2f0}.opening-track{width:100%;height:12px;background:#22323b;border:1px solid #42635f}.opening-track i{display:block;height:100%;width:0;background:#8adcc6;transition:width .2s}.opening-loading span{font:18px monospace;color:#86d8c0}
+/* HUD number-key hints; 2 must be pressed twice, so the raid button pulses while armed. */
+.hud-actions kbd{margin-left:7px;min-width:18px;height:18px;font-size:9px;vertical-align:1px}.touch .hud-actions kbd{display:none}
+#use-raid.armed{background:#5a3410;border-color:#ffb347;box-shadow:0 0 0 2px #ffb34755;animation:raidArm .5s steps(2) infinite}@keyframes raidArm{50%{box-shadow:0 0 0 4px #ffb34722}}@media(prefers-reduced-motion:reduce){#use-raid.armed{animation:none}}

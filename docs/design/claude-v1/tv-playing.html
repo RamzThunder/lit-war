@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TV · 진행 중</title>
+<link rel="stylesheet" href="system.css">
+<style>
+body{width:1920px;height:1080px;overflow:hidden}
+.screen{height:100%;padding:44px 72px 56px;display:grid;grid-template-rows:auto auto auto 1fr;row-gap:36px}
+.sysline{font-size:24px;justify-content:space-between}
+.sysline .join{display:flex;align-items:center;gap:18px;color:var(--muted)}
+.sysline .join .sys{font-size:32px;color:var(--text);letter-spacing:.18em}
+.mini-qr{width:64px;height:64px;background:#fff;padding:5px;border-radius:6px}
+
+.hero{display:grid;grid-template-columns:1fr auto 1fr;align-items:end}
+.team .sys{display:block;font-size:128px;line-height:.85}
+.team .name{display:block;font-size:32px;font-weight:700;margin-top:18px}.team.blue .name{color:var(--blue)}.team.red .name{color:var(--red)}
+.team small{font-size:24px;color:var(--muted);font-weight:400;margin-left:.6em}
+.team.red{text-align:right}
+.clock{text-align:center;padding:0 40px}
+.clock .sys{font-size:112px;line-height:.85;letter-spacing:.06em}
+.clock .state{display:block;margin-top:18px;font-size:24px;color:var(--muted)}
+
+.tug{position:relative;height:12px;border-radius:6px;overflow:hidden;display:flex;background:var(--red)}
+.tug i{width:56.7%;background:var(--blue)}
+.tug::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;background:var(--bg)}
+
+.lower{display:grid;grid-template-columns:1fr 560px;column-gap:56px;min-height:0}
+h2{display:flex;justify-content:space-between;align-items:baseline;font-size:24px;font-weight:600;color:var(--muted);margin-bottom:20px}
+h2 .sys-light{font-size:24px;color:var(--faint)}
+.map{display:flex;flex-direction:column;min-height:0}
+.eras{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;gap:16px}
+.era{padding:26px 28px 26px 34px;gap:6px}
+.era .yr{font-size:48px;line-height:1}
+.era .owner{font-size:24px;margin-top:4px}
+.era .split{margin-top:auto}
+.era .nums{display:flex;justify-content:space-between;font-size:28px;margin-top:12px}
+.era .flag{top:24px;right:24px;font-size:20px;padding:3px 12px}
+
+.side{display:flex;flex-direction:column;min-height:0}
+.alertband{display:flex;align-items:center;justify-content:space-between;padding:22px 28px;margin-bottom:32px}
+.alertband b{font-size:28px;color:var(--alert)} .alertband p{font-size:24px;color:#d7c5f2;margin-top:4px}
+.alertband .sys{font-size:56px;color:var(--alert)}
+.log{gap:22px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent)}
+.log li{font-size:26px;line-height:1.35}
+.log time{font-size:24px}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="sysline">
+    <span><b>HUMAN ARCHIVE NET</b> · SECTOR 03 · 현대문학 기록 보관소 &nbsp; <span class="dot live"></span> LIVE 14:21:08</span>
+    <span class="join">늦게 왔다면 <span class="sys">AH7FHG</span><span class="mini-qr" id="qr"></span></span>
+  </div>
+
+  <section class="hero">
+    <div class="team blue"><span class="sys c-blue">340</span><span class="name">인류유산 보존관<small>14명 · 4개 시대</small></span></div>
+    <div class="clock"><span class="sys">17:42</span><span class="state"><span class="dot live"></span> 진행 중 · 남은 시간</span></div>
+    <div class="team red"><span class="sys c-red">260</span><span class="name"><small style="margin:0 .6em 0 0">3개 시대 · 14명</small>러다이트</span></div>
+  </section>
+
+  <div class="tug"><i></i></div>
+
+  <section class="lower">
+    <div class="map">
+      <h2>기록 보관소 지도 <span class="sys-light">1910 — 1980</span></h2>
+      <div class="eras" id="eras"></div>
+    </div>
+    <div class="side">
+      <div class="alertband"><div><b>⚠ 오염 경보</b><p>미끼 심기 · 정화 점수 2배</p></div><span class="sys">0:41</span></div>
+      <h2>관제 로그</h2>
+      <ol class="log" id="feed"></ol>
+    </div>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+<script src="data.js"></script>
+<script>D.renderEras(eras); D.renderFeed(feed, 6); D.renderQR(qr);</script>
+</body>
+</html>

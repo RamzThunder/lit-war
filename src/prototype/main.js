@@ -6,6 +6,7 @@ import { DataCenter } from './scenes/DataCenter.js';
 import { bindUI } from './ui/bindUI.js';
 import { bindTouch } from './ui/bindTouch.js';
 import { bindOpening } from './ui/bindOpening.js';
+import { bindShortcuts } from './ui/bindShortcuts.js';
 const state = new SessionState();
 bindSession(state);
 // Dev-only handle for automated browser checks; not included in production builds.
@@ -13,6 +14,7 @@ if (import.meta.env.DEV) window.__litwar = state;
 const updateContext = bindUI(state);
 const touch = bindTouch();
 bindOpening(state);
+bindShortcuts(state);
 new Phaser.Game({
   type: Phaser.AUTO, parent: 'game', backgroundColor: '#101b25',
   pixelArt: true, roundPixels: true, antialias: false,

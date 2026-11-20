@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2030 현대문학사 데이터 점령전 - UI 디자인 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root {
+    --bg-canvas: #0B0E14;
+    --bg-surface: #121721;
+    --bg-elevated: #1A212E;
+    --bg-human: #F1F5F4;
+    --bg-human-card: #FFFFFF;
+    
+    --team-blue: #0EA5E9;
+    --team-blue-dim: rgba(14, 165, 233, 0.14);
+    --team-red: #F43F5E;
+    --team-red-dim: rgba(244, 63, 94, 0.14);
+    --accent-alert: #F59E0B;
+    --accent-alert-dim: rgba(245, 158, 11, 0.15);
+    --status-ok: #10B981;
+
+    --text-primary: #F1F5F9;
+    --text-muted: #64748B;
+    --border-hair: rgba(255, 255, 255, 0.08);
+    --border-human: rgba(15, 23, 42, 0.1);
+
+    --font-pixel: 'Galmuri11', monospace;
+    --font-sans: 'Pretendard', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #05070A;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* 시안 전환용 내비게이션 바 (실제 게임 UI 아님) */
+  .preview-nav {
+    width: 100%;
+    background: #1E293B;
+    padding: 12px 24px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 999;
+  }
+  .preview-nav button {
+    background: #0F172A;
+    color: #94A3B8;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .preview-nav button.active {
+    background: var(--team-blue);
+    color: #fff;
+    border-color: var(--team-blue);
+  }
+  .preview-meta {
+    margin: 12px 0;
+    font-size: 13px;
+    color: #94A3B8;
+    font-family: var(--font-pixel);
+  }
+
+  /* 공통 유틸리티 */
+  .pixel { font-family: var(--font-pixel); }
+  .blue-txt { color: var(--team-blue); }
+  .red-txt { color: var(--team-red); }
+  .alert-txt { color: var(--accent-alert); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+  .dot.ok { background: var(--status-ok); box-shadow: 0 0 8px var(--status-ok); }
+  .dot.alert { background: var(--accent-alert); animation: blink 1s infinite; }
+  .dot.idle { background: #475569; }
+
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* 화면 컨테이너 (축소 프리뷰 지원) */
+  .viewport-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+    padding: 0 20px;
+  }
+  .screen {
+    display: none;
+    background: var(--bg-canvas);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    overflow: hidden;
+    position: relative;
+  }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ==========================================================================
+     1. TV 화면 (1920x1080 -> 시안 확인용 1440x810 비율 스케일링, 폰트 비율 유지)
+     ========================================================================== */
+  .tv-screen {
+    width: 1440px;
+    height: 810px;
+    padding: 28px 36px;
+    justify-content: space-between;
+  }
+  .tv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-hair);
+  }
+  .tv-sys-id { font-size: 20px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
+  .tv-timer { font-size: 56px; font-weight: bold; letter-spacing: 2px; line-height: 1; }
+  .tv-room-badge {
+    background: var(--bg-surface);
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 20px;
+    color: var(--text-muted);
+  }
+  .tv-room-badge strong { color: var(--text-primary); margin-left: 8px; }
+
+  /* 줄다리기 전황 게이지 */
+  .tv-tug-section {
+    background: var(--bg-surface);
+    padding: 20px 28px;
+    border-radius: 8px;
+  }
+  .tv-scores-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .tv-team-info { display: flex; align-items: baseline; gap: 16px; }
+  .tv-team-name { font-size: 24px; font-weight: 700; }
+  .tv-team-sub { font-size: 20px; color: var(--text-muted); }
+  .tv-score-num { font-size: 42px; }
+  .tug-bar-track {
+    height: 16px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+  .tug-blue { width: 54%; background: var(--team-blue); transition: width 0.4s; }
+  .tug-red { width: 46%; background: var(--team-red); transition: width 0.4s; }
+  .tug-center-mark {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; background: #fff;
+  }
+
+  /* TV 메인 그리드: 좌측 시대 8칸 지도 + 우측 관제 로그 */
+  .tv-main-grid {
+    display: grid;
+    grid-template-columns: 1.65fr 1fr;
+    gap: 24px;
+    flex: 1;
+    margin-top: 20px;
+  }
+  .sector-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .sector-card {
+    background: var(--bg-surface);
+    border-radius: 8px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-left: 4px solid #334155;
+  }
+  .sector-card.blue { background: linear-gradient(180deg, var(--team-blue-dim) 0%, var(--bg-surface) 100%); border-left-color: var(--team-blue); }
+  .sector-card.red { background: linear-gradient(180deg, var(--team-red-dim) 0%, var(--bg-surface) 100%); border-left-color: var(--team-red); }
+  .sector-card.contested { border-left-color: #94A3B8; }
+  .sector-top { display: flex; justify-content: space-between; align-items: center; }
+  .sector-code { font-size: 18px; color: var(--text-muted); }
+  .sector-era { font-size: 26px; font-weight: 800; margin: 6px 0; }
+  .sector-status { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .sector-pts {
+    display: flex;
+    justify-content: space-between;
+    font-size: 20px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-hair);
+  }
+
+  /* 실시간 관제 로그 */
+  .tv-log-panel {
+    background: var(--bg-surface);
+    border-radius: 8px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-label {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .log-list { display: flex; flex-direction: column; gap: 12px; }
+  .log-item {
+    font-size: 20px;
+    line-height: 1.4;
+    padding: 10px 14px;
+    background: var(--bg-elevated);
+    border-radius: 6px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .log-time { color: var(--text-muted); font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+
+  /* TV 입장 대기 화면 */
+  .tv-lobby {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 32px;
+    align-items: center;
+    padding: 20px 0;
+  }
+  .lobby-access-box {
+    background: var(--bg-surface);
+    padding: 40px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .qr-placeholder {
+    width: 180px; height: 180px;
+    background: #fff;
+    color: #0B0E14;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border-radius: 8px;
+    font-size: 20px;
+  }
+  .lobby-teams { display: flex; flex-direction: column; gap: 20px; }
+  .lobby-team-card {
+    background: var(--bg-surface);
+    padding: 28px;
+    border-radius: 8px;
+    border-left: 6px solid var(--team-blue);
+  }
+  .lobby-team-card.red { border-left-color: var(--team-red); }
+
+  /* TV 실시간 공격 중계 오버레이 */
+  .tv-raid-overlay {
+    position: absolute;
+    inset: 96px 36px 28px 36px;
+    background: rgba(11, 14, 20, 0.96);
+    border: 2px solid var(--accent-alert);
+    border-radius: 8px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .raid-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .raid-body {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 28px;
+    flex: 1;
+    margin-top: 20px;
+  }
+  .pixel-canvas-mock {
+    background: #171E29;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-image: radial-gradient(#263244 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .sprite {
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 20px;
+    font-weight: bold;
+    position: absolute;
+  }
+  .raid-stats {
+    background: var(--bg-surface);
+    padding: 28px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .shock-dots { display: flex; gap: 12px; margin-top: 10px; }
+  .shock-unit {
+    flex: 1; height: 18px; background: var(--bg-elevated); border-radius: 4px;
+  }
+  .shock-unit.filled { background: var(--accent-alert); }
+
+  /* ==========================================================================
+     2. 교사용 화면 (1366x820)
+     ========================================================================== */
+  .teacher-screen {
+    width: 1366px;
+    height: 820px;
+    padding: 16px 20px;
+    gap: 14px;
+  }
+  .t-topbar {
+    background: var(--bg-surface);
+    padding: 12px 18px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .t-controls { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    padding: 8px 14px;
+    border-radius: 4px;
+    border: none;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
+  .btn.primary { background: var(--team-blue); color: #fff; }
+  .btn.alert { background: var(--accent-alert-dim); color: var(--accent-alert); border: 1px solid var(--accent-alert); }
+  .btn.danger { background: rgba(244, 63, 94, 0.15); color: var(--team-red); }
+  .btn.sm { padding: 4px 8px; font-size: 12px; }
+
+  .t-main-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 0.9fr;
+    gap: 14px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .t-col {
+    background: var(--bg-surface);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .roster-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .roster-row {
+    background: var(--bg-elevated);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .t-sector-mini {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .t-sec-cell {
+    background: var(--bg-elevated);
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    border-top: 3px solid #475569;
+  }
+  .t-sec-cell.blue { border-top-color: var(--team-blue); }
+  .t-sec-cell.red { border-top-color: var(--team-red); }
+  .t-log-box {
+    background: var(--bg-elevated);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* ==========================================================================
+     3. 학생 화면 (1366x768 크롬북 고정, 스크롤 없음)
+     ========================================================================== */
+  .student-screen {
+    width: 1366px;
+    height: 768px;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  /* 보존관 테마 (HUMAN 공식 단말기: 밝고 정돈된 민트/화이트 OS) */
+  .student-screen.human-theme {
+    background: var(--bg-human);
+    color: #0F172A;
+  }
+  .student-screen.human-theme .s-hud-top,
+  .student-screen.human-theme .s-hud-bottom,
+  .student-screen.human-theme .s-mini-sectors {
+    background: var(--bg-human-card);
+    border: 1px solid var(--border-human);
+  }
+  .student-screen.human-theme .s-sec-pill { background: #F1F5F9; color: #334155; }
+  .student-screen.human-theme .s-sec-pill.blue { background: var(--team-blue-dim); color: #0369A1; }
+  .student-screen.human-theme .s-sec-pill.red { background: var(--team-red-dim); color: #BE123C; }
+  .student-screen.human-theme .keycap { background: #E2E8F0; color: #0F172A; border-bottom: 2px solid #CBD5E1; }
+
+  /* 러다이트 테마 (해킹 단말기: 어두운 다크 OS + 레드 터미널 감성) */
+  .student-screen.luddite-theme {
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+  }
+  .student-screen.luddite-theme .s-hud-top,
+  .student-screen.luddite-theme .s-hud-bottom,
+  .student-screen.luddite-theme .s-mini-sectors {
+    background: var(--bg-surface);
+    border: 1px solid rgba(244, 63, 94, 0.25);
+  }
+  .student-screen.luddite-theme .s-sec-pill { background: var(--bg-elevated); color: #94A3B8; }
+  .student-screen.luddite-theme .s-sec-pill.blue { background: var(--team-blue-dim); color: var(--team-blue); }
+  .student-screen.luddite-theme .s-sec-pill.red { background: var(--team-red-dim); color: var(--team-red); }
+  .student-screen.luddite-theme .keycap { background: #1E293B; color: #F8FAFC; border-bottom: 2px solid #0F172A; }
+
+  /* 학생 공통 레이아웃 (게임 뷰포트 82% 이상 확보) */
+  .s-hud-top {
+    height: 48px;
+    border-radius: 6px;
+    padding: 0 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .s-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .s-badge.blue { background: var(--team-blue); color: #fff; }
+  .s-badge.red { background: var(--team-red); color: #fff; }
+
+  .s-game-stage {
+    flex: 1;
+    background: #141A23;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  /* 게임 뷰포트 위 플로팅 HUD */
+  .s-mini-sectors {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: flex;
+    gap: 6px;
+  }
+  .s-sec-pill {
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-pixel);
+  }
+  .s-raid-banner {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid var(--accent-alert);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .s-interact-prompt {
+    position: absolute;
+    bottom: 24px;
+    background: rgba(11, 14, 20, 0.9);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .s-hud-bottom {
+    height: 54px;
+    border-radius: 6px;
+    padding: 0 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .s-skills { display: flex; gap: 10px; }
+  .skill-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(128,128,128,0.25);
+  }
+  .keycap {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+  <nav class="preview-nav">
+    <button class="active" onclick="showScreen('tv-play', this)">1. TV - 진행 중 (1920×1080)</button>
+    <button onclick="showScreen('tv-lobby', this)">2. TV - 입장 대기</button>
+    <button onclick="showScreen('tv-raid', this)">3. TV - 실시간 공격 중계</button>
+    <button onclick="showScreen('teacher-play', this)">4. 교사용 - 진행 중 (1366×820)</button>
+    <button onclick="showScreen('student-blue', this)">5. 학생 - 인류유산 보존관 (1366×768)</button>
+    <button onclick="showScreen('student-red', this)">6. 학생 - 러다이트 (1366×768)</button>
+  </nav>
+  <div class="preview-meta" id="meta-label">VIEWPORT: TV 전황판 (진행 중) | 16:9 비율</div>
+
+  <div class="viewport-wrapper">
+
+    <!-- ==================== 1. TV: 진행 중 ==================== -->
+    <section id="tv-play" class="screen tv-screen active">
+      <header class="tv-header">
+        <div class="tv-sys-id pixel">
+          <span class="dot ok"></span>
+          <span>HUMAN ARCHIVE MONITOR // 2030.11.20</span>
+        </div>
+        <div class="tv-timer pixel">24:18</div>
+        <div class="tv-room-badge pixel">입장 코드 <strong class="blue-txt">K7M9P2</strong></div>
+      </header>
+
+      <div class="tv-tug-section">
+        <div class="tv-scores-row">
+          <div class="tv-team-info">
+            <span class="tv-team-name blue-txt">인류유산 보존관</span>
+            <span class="tv-team-sub">접속 14명 · 점령 4개 시대</span>
+            <span class="tv-score-num pixel blue-txt">1,420</span>
+          </div>
+          <div class="tv-team-info">
+            <span class="tv-score-num pixel red-txt">1,210</span>
+            <span class="tv-team-sub">점령 3개 시대 · 접속 14명</span>
+            <span class="tv-team-name red-txt">러다이트</span>
+          </div>
+        </div>
+        <div class="tug-bar-track">
+          <div class="tug-blue"></div>
+          <div class="tug-red"></div>
+          <div class="tug-center-mark"></div>
+        </div>
+      </div>
+
+      <div class="tv-main-grid">
+        <div class="sector-grid">
+          <div class="sector-card blue">
+            <div class="sector-top"><span class="sector-code pixel">SEC-01</span><span class="dot ok"></span></div>
+            <div class="sector-era">1910년대</div>
+            <div class="sector-status blue-txt">보존관 점령</div>
+            <div class="sector-pts pixel"><span class="blue-txt">210</span><span class="red-txt">140</span></div>
+          </div>
+          <div class="sector-card blue">
+            <div class="sector-top"><span class="sector-code pixel">SEC-02</span><span class="dot ok"></span></div>
+            <div class="sector-era">1920년대</div>
+            <div class="sector-status blue-txt">보존관 점령</div>
+            <div class="sector-pts pixel"><span class="blue-txt">320</span><span class="red-txt">250</span></div>
+          </div>
+          <div class="sector-card red">
+            <div class="sector-top"><span class="sector-code pixel">SEC-03</span><span class="dot alert"></span></div>
+            <div class="sector-era">1930년대</div>
+            <div class="sector-status alert-txt">🧪 오염 감지됨</div>
+            <div class="sector-pts pixel"><span class="blue-txt">190</span><span class="red-txt">280</span></div>
+          </div>
+          <div class="sector-card contested">
+            <div class="sector-top"><span class="sector-code pixel">SEC-04</span><span class="dot idle"></span></div>
+            <div class="sector-era">1940년대</div>
+            <div class="sector-status">접전 (동점)</div>
+            <div class="sector-pts pixel"><span class="blue-txt">150</span><span class="red-txt">150</span></div>
+          </div>
+          <div class="sector-card blue">
+            <div class="sector-top"><span class="sector-code pixel">SEC-05</span><span class="dot ok"></span></div>
+            <div class="sector-era">1950년대</div>
+            <div class="sector-status blue-txt">보존관 점령</div>
+            <div class="sector-pts pixel"><span class="blue-txt">180</span><span class="red-txt">110</span></div>
+          </div>
+          <div class="sector-card red">
+            <div class="sector-top"><span class="sector-code pixel">SEC-06</span><span class="dot ok"></span></div>
+            <div class="sector-era">1960년대</div>
+            <div class="sector-status red-txt">러다이트 점령</div>
+            <div class="sector-pts pixel"><span class="blue-txt">120</span><span class="red-txt">190</span></div>
+          </div>
+          <div class="sector-card red">
+            <div class="sector-top"><span class="sector-code pixel">SEC-07</span><span class="dot ok"></span></div>
+            <div class="sector-era">1970년대</div>
+            <div class="sector-status red-txt">러다이트 점령</div>
+            <div class="sector-pts pixel"><span class="blue-txt">150</span><span class="red-txt">190</span></div>
+          </div>
+          <div class="sector-card">
+            <div class="sector-top"><span class="sector-code pixel">SEC-08</span><span class="dot idle"></span></div>
+            <div class="sector-era">1980년대</div>
+            <div class="sector-status" style="color:var(--text-muted)">비어 있음</div>
+            <div class="sector-pts pixel"><span class="blue-txt">0</span><span class="red-txt">0</span></div>
+          </div>
+        </div>
+
+        <aside class="tv-log-panel">
+          <div class="panel-label pixel"><span>SYSTEM EVENT LOG</span><span>LIVE</span></div>
+          <div class="log-list">
+            <div class="log-item">
+              <span class="log-time pixel">14:22</span>
+              <span><strong class="red-txt">김민준</strong>이 1930년대 단말기에 가짜 기록을 심었습니다.</span>
+            </div>
+            <div class="log-item">
+              <span class="log-time pixel">14:19</span>
+              <span><strong class="blue-txt">이서연</strong>이 1920년대 오염 데이터를 정화했습니다. (+30)</span>
+            </div>
+            <div class="log-item">
+              <span class="log-time pixel">14:15</span>
+              <span><strong class="blue-txt">박지훈</strong>이 <strong class="red-txt">최유진</strong>의 기록실 침입을 막아냈습니다.</span>
+            </div>
+            <div class="log-item">
+              <span class="log-time pixel">14:11</span>
+              <span><strong class="red-txt">정하윤</strong>이 실시간 공격 권한을 획득했습니다.</span>
+            </div>
+            <div class="log-item">
+              <span class="log-time pixel">14:08</span>
+              <span>1960년대 섹터 주도권이 <strong class="red-txt">러다이트</strong>로 넘어갔습니다.</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ==================== 2. TV: 입장 대기 ==================== -->
+    <section id="tv-lobby" class="screen tv-screen">
+      <header class="tv-header">
+        <div class="tv-sys-id pixel"><span class="dot ok"></span><span>CONNECTION STANDBY // 교실 접속 대기</span></div>
+        <div class="tv-timer pixel" style="font-size:36px; color:var(--text-muted)">READY</div>
+      </header>
+
+      <div class="tv-lobby">
+        <div class="lobby-access-box">
+          <div style="font-size:24px; color:var(--text-muted);">크롬북 브라우저에서 아래 주소로 접속하세요</div>
+          <div class="pixel" style="font-size:36px; color:#fff;">archive2030.kr</div>
+          <div style="display:flex; gap:32px; align-items:center; margin-top:12px;">
+            <div class="qr-placeholder pixel">QR CODE</div>
+            <div>
+              <div style="font-size:22px; color:var(--text-muted); margin-bottom:8px;">방 입장 코드 (6자리)</div>
+              <div class="pixel blue-txt" style="font-size:76px; letter-spacing:6px;">K7M9P2</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lobby-teams">
+          <div style="font-size:26px; font-weight:700;">현재 접속 인원 <span class="pixel" style="margin-left:12px;">28 / 30명</span></div>
+          <div class="lobby-team-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:28px; font-weight:700;" class="blue-txt">인류유산 보존관</span>
+              <span class="pixel blue-txt" style="font-size:44px;">14명</span>
+            </div>
+            <div style="font-size:20px; color:var(--text-muted); margin-top:12px;">이서연, 박지훈, 강도윤, 윤서아, 한지민 외 9명</div>
+          </div>
+          <div class="lobby-team-card red">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:28px; font-weight:700;" class="red-txt">러다이트</span>
+              <span class="pixel red-txt" style="font-size:44px;">14명</span>
+            </div>
+            <div style="font-size:20px; color:var(--text-muted); margin-top:12px;">김민준, 최유진, 정하윤, 송지호, 오채원 외 9명</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. TV: 실시간 공격 중계 ==================== -->
+    <section id="tv-raid" class="screen tv-screen">
+      <header class="tv-header">
+        <div class="tv-sys-id pixel"><span class="dot alert"></span><span>INTRUSION DETECTED // 실시간 침입 중계</span></div>
+        <div class="tv-timer pixel">22:05</div>
+        <div class="tv-room-badge pixel">진행 중인 침입 <strong>2건</strong></div>
+      </header>
+
+      <div class="tv-raid-overlay">
+        <div class="raid-header">
+          <div style="font-size:32px; font-weight:800;">
+            <span class="red-txt">[러다이트] 김민준</span>
+            <span style="margin:0 16px; color:var(--text-muted);">▶ 침입 ▶</span>
+            <span class="blue-txt">[보존관] 이서연의 기록실</span>
+          </div>
+          <div class="pixel alert-txt" style="font-size:48px;">09.4s</div>
+        </div>
+
+        <div class="raid-body">
+          <div class="pixel-canvas-mock">
+            <span style="color:var(--text-muted); font-size:22px;" class="pixel">[ 탑다운 픽셀 기록실 실시간 중계 화면 ]</span>
+            <div class="sprite pixel" style="background:var(--team-red); top:35%; left:30%;">김민준 (침입자)</div>
+            <div class="sprite pixel" style="background:var(--team-blue); bottom:30%; right:28%;">이서연 (방어자)</div>
+          </div>
+
+          <div class="raid-stats">
+            <div>
+              <div style="font-size:22px; color:var(--text-muted);">감전 방어 누적 (5회 시 강제 퇴출)</div>
+              <div class="pixel" style="font-size:38px; margin-top:8px;">3 / 5 회</div>
+              <div class="shock-dots">
+                <div class="shock-unit filled"></div>
+                <div class="shock-unit filled"></div>
+                <div class="shock-unit filled"></div>
+                <div class="shock-unit"></div>
+                <div class="shock-unit"></div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border-hair); padding-top:20px;">
+              <div style="font-size:22px; color:var(--text-muted);">현재 확보한 탈취 점수</div>
+              <div class="pixel alert-txt" style="font-size:44px; margin-top:4px;">+15 PTS</div>
+            </div>
+
+            <div style="background:var(--bg-elevated); padding:16px; border-radius:6px; font-size:22px;">
+              다른 침입: <strong class="blue-txt">박지훈</strong> → <strong class="red-txt">정하윤</strong> (남은 시간 13초)
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. 교사용 화면: 진행 중 ==================== -->
+    <section id="teacher-play" class="screen teacher-screen">
+      <div class="t-topbar">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span class="dot ok"></span>
+          <strong style="font-size:15px;">진행 중</strong>
+          <span class="pixel" style="font-size:24px;">24:18</span>
+          <span style="color:var(--text-muted); font-size:13px;">방 코드: <strong class="pixel blue-txt">K7M9P2</strong></span>
+          <button class="btn sm">QR / 입장 안내 열기</button>
+        </div>
+        <div class="t-controls">
+          <button class="btn">🎬 오프닝 다시 재생</button>
+          <button class="btn alert">⚠ 오염 경보 발동 (1분)</button>
+          <button class="btn">⏸ 멈춤</button>
+          <button class="btn danger">↺ 초기화</button>
+          <button class="btn danger">■ 수업 종료</button>
+        </div>
+      </div>
+
+      <div class="t-main-grid">
+        <!-- 1열: 학생 명단 (진영별 2열) -->
+        <div class="t-col">
+          <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700;">
+            <span>학생 접속 및 활동 현황 (28명)</span>
+            <span class="pixel" style="color:var(--text-muted)">MAX 30</span>
+          </div>
+          <div class="roster-split">
+            <div>
+              <div class="blue-txt" style="font-size:12px; font-weight:700; margin-bottom:8px;">보존관 (14명)</div>
+              <div class="roster-row">
+                <div><span class="dot ok"></span> <strong>이서연</strong> <span class="pixel" style="color:var(--text-muted)">미션 12</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+              <div class="roster-row">
+                <div><span class="dot alert"></span> <strong>박지훈</strong> <span class="alert-txt" style="font-size:11px;">공격중</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+              <div class="roster-row">
+                <div><span class="dot ok"></span> <strong>강도윤</strong> <span class="pixel" style="color:var(--text-muted)">미션 7</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+              <div class="roster-row">
+                <div><span class="dot idle"></span> <span style="color:var(--text-muted)">윤서아 (오프라인)</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+            </div>
+            <div>
+              <div class="red-txt" style="font-size:12px; font-weight:700; margin-bottom:8px;">러다이트 (14명)</div>
+              <div class="roster-row">
+                <div><span class="dot alert"></span> <strong>김민준</strong> <span class="alert-txt" style="font-size:11px;">공격중</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+              <div class="roster-row">
+                <div><span class="dot ok"></span> <strong>최유진</strong> <span class="pixel" style="color:var(--text-muted)">미션 9</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+              <div class="roster-row">
+                <div><span class="dot ok"></span> <strong>정하윤</strong> <span class="pixel" style="color:var(--text-muted)">미션 11</span></div>
+                <button class="btn sm danger">퇴장</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2열: 시대 점령 + 오염 기록 로그 -->
+        <div class="t-col">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px; font-weight:700;">전황 요약</span>
+            <span class="pixel" style="font-size:14px;"><span class="blue-txt">1,420</span> : <span class="red-txt">1,210</span></span>
+          </div>
+          <div class="t-sector-mini">
+            <div class="t-sec-cell blue"><strong>1910s</strong><div class="pixel">210:140</div></div>
+            <div class="t-sec-cell blue"><strong>1920s</strong><div class="pixel">320:250</div></div>
+            <div class="t-sec-cell red"><strong>1930s 🧪</strong><div class="pixel">190:280</div></div>
+            <div class="t-sec-cell"><strong>1940s</strong><div class="pixel">150:150</div></div>
+            <div class="t-sec-cell blue"><strong>1950s</strong><div class="pixel">180:110</div></div>
+            <div class="t-sec-cell red"><strong>1960s</strong><div class="pixel">120:190</div></div>
+            <div class="t-sec-cell red"><strong>1970s</strong><div class="pixel">150:190</div></div>
+            <div class="t-sec-cell"><strong>1980s</strong><div class="pixel">0:0</div></div>
+          </div>
+
+          <div style="font-size:13px; font-weight:700; margin-top:4px;">오염(미끼) 및 정화 기록</div>
+          <div class="t-log-box">
+            <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-hair);">
+              <span class="alert-txt">[미정화]</span> <strong>1930년대 · 이상 「날개」</strong><br>
+              발표 연도: <span style="text-decoration:line-through; color:var(--text-muted)">1936년</span> → <strong class="red-txt">1926년 (가짜)</strong><br>
+              <span style="color:var(--text-muted)">심은 학생: 김민준 → 대상: 이서연 방</span>
+            </div>
+            <div>
+              <span style="color:var(--status-ok)">[정화 완료]</span> <strong>1920년대 · 현진건 「운수 좋은 날」</strong><br>
+              주인공 이름 변조 복구 완료 (정화자: 이서연)
+            </div>
+          </div>
+        </div>
+
+        <!-- 3열: 실시간 공격 중계 & 관제 소식 -->
+        <div class="t-col">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px; font-weight:700;">실시간 공격 중계 (2건)</span>
+            <div style="display:flex; gap:4px;">
+              <button class="btn sm primary">1. 김민준→이서연</button>
+              <button class="btn sm">2. 박지훈→정하윤</button>
+            </div>
+          </div>
+          <div class="pixel-canvas-mock" style="height:180px;">
+            <span class="pixel" style="font-size:12px; color:var(--text-muted)">[교사용 실시간 공격 관전 화면]</span>
+            <div class="sprite pixel" style="font-size:11px; padding:4px 8px; background:var(--team-red); top:25%; left:25%;">김민준</div>
+            <div class="sprite pixel" style="font-size:11px; padding:4px 8px; background:var(--team-blue); bottom:25%; right:25%;">이서연</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; background:var(--bg-elevated); padding:8px 12px; border-radius:6px;">
+            <span>감전: <strong>3/5회</strong></span>
+            <span>탈취 예정: <strong class="alert-txt">15점</strong></span>
+            <span>남은 시간: <strong class="pixel">09.4s</strong></span>
+          </div>
+
+          <div style="font-size:13px; font-weight:700; margin-top:4px;">실시간 소식</div>
+          <div class="t-log-box" style="flex:1;">
+            <div><span class="pixel" style="color:var(--text-muted)">14:22</span> 김민준 → 1930s 미끼 설치</div>
+            <div><span class="pixel" style="color:var(--text-muted)">14:19</span> 이서연 → 1920s 오염 정화</div>
+            <div><span class="pixel" style="color:var(--text-muted)">14:15</span> 박지훈 → 최유진 침입 방어</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. 학생: 인류유산 보존관 (HUMAN 공식 OS) ==================== -->
+    <section id="student-blue" class="screen student-screen human-theme">
+      <header class="s-hud-top">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="s-badge blue">HUMAN 보존관</span>
+          <strong style="font-size:14px;">위치: 내 기록실 (이서연)</strong>
+          <span style="font-size:12px; color:#64748B;">| 완료 미션 <strong class="pixel" style="color:#0F172A;">12개</strong> (다음 권한까지 3개)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <span style="font-size:12px; color:#64748B;"><span class="dot ok"></span> 접속 28명 · 코드 K7M9P2</span>
+          <span class="pixel" style="font-size:20px; font-weight:bold;">24:18</span>
+        </div>
+      </header>
+
+      <main class="s-game-stage">
+        <div class="s-mini-sectors">
+          <span class="s-sec-pill blue">10s 210</span>
+          <span class="s-sec-pill blue">20s 320</span>
+          <span class="s-sec-pill red">30s 🧪</span>
+          <span class="s-sec-pill">40s 150</span>
+          <span class="s-sec-pill blue">50s 180</span>
+          <span class="s-sec-pill red">60s 190</span>
+          <span class="s-sec-pill red">70s 190</span>
+          <span class="s-sec-pill">80s -</span>
+        </div>
+
+        <div class="s-raid-banner">
+          <span class="alert-txt font-bold">⚠ 침입 경보! 러다이트(김민준) 침입 중</span>
+          <span>감전 3/5회</span>
+          <span class="pixel alert-txt" style="font-size:16px;">09.4s</span>
+        </div>
+
+        <div class="pixel" style="color:#64748B; font-size:18px;">[ 탑다운 픽셀 기록실 뷰포트 — 화면 높이의 83% 확보 ]</div>
+
+        <div class="s-interact-prompt">
+          <span class="keycap" style="background:#0EA5E9; color:#fff; border:none;">E</span>
+          <span>1930년대 단말기 정화하기</span>
+        </div>
+      </main>
+
+      <footer class="s-hud-bottom">
+        <div class="s-skills">
+          <div class="skill-btn"><span class="keycap">1</span> 🛠 방해 공작 <strong>(2)</strong></div>
+          <div class="skill-btn"><span class="keycap">2</span> ⚡ 실시간 공격 <strong>(1)</strong></div>
+          <div class="skill-btn" style="border-color:var(--team-blue); color:#0369A1;"><span class="keycap">3</span> 🪤 감전 함정 설치 <strong>(1)</strong></div>
+        </div>
+        <div style="display:flex; gap:14px; font-size:12px; color:#64748B;">
+          <span><span class="keycap">WASD</span> 이동</span>
+          <span><span class="keycap">E</span> 상호작용</span>
+          <span><span class="keycap">SPACE</span> 감전 방어</span>
+          <span><span class="keycap">ESC</span> 창 닫기</span>
+        </div>
+      </footer>
+    </section>
+
+    <!-- ==================== 6. 학생: 러다이트 (해킹 단말기 OS) ==================== -->
+    <section id="student-red" class="screen student-screen luddite-theme">
+      <header class="s-hud-top">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="s-badge red">LUDDITE // 비인가 접속</span>
+          <strong style="font-size:14px; color:var(--team-red);">위치: 습격 중 — 이서연의 기록실</strong>
+          <span style="font-size:12px; color:var(--text-muted);">| 완료 미션 <strong class="pixel" style="color:#fff;">14개</strong> (다음 권한까지 1개)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <span style="font-size:12px; color:var(--text-muted);"><span class="dot ok"></span> 접속 28명 · 코드 K7M9P2</span>
+          <span class="pixel" style="font-size:20px; font-weight:bold;">24:18</span>
+        </div>
+      </header>
+
+      <main class="s-game-stage">
+        <div class="s-mini-sectors">
+          <span class="s-sec-pill blue">10s 210</span>
+          <span class="s-sec-pill blue">20s 320</span>
+          <span class="s-sec-pill red">30s 🧪</span>
+          <span class="s-sec-pill">40s 150</span>
+          <span class="s-sec-pill blue">50s 180</span>
+          <span class="s-sec-pill red">60s 190</span>
+          <span class="s-sec-pill red">70s 190</span>
+          <span class="s-sec-pill">80s -</span>
+        </div>
+
+        <div class="s-raid-banner">
+          <span class="red-txt font-bold">⚡ 기록실 습격 중! 단말기에서 점수를 탈취하세요</span>
+          <span>피격 3/5회</span>
+          <span class="pixel alert-txt" style="font-size:16px;">09.4s</span>
+        </div>
+
+        <div class="pixel" style="color:#475569; font-size:18px;">[ 탑다운 픽셀 기록실 뷰포트 — 화면 높이의 83% 확보 ]</div>
+
+        <div class="s-interact-prompt">
+          <span class="keycap" style="background:#F43F5E; color:#fff; border:none;">E</span>
+          <span>가짜 기록(미끼) 심기</span>
+        </div>
+      </main>
+
+      <footer class="s-hud-bottom">
+        <div class="s-skills">
+          <div class="skill-btn"><span class="keycap">1</span> 🛠 방해 공작 <strong>(1)</strong></div>
+          <div class="skill-btn" style="border-color:var(--team-red); color:var(--team-red);"><span class="keycap">2</span> ⚡ 실시간 공격 <strong>(0)</strong></div>
+        </div>
+        <div style="display:flex; gap:14px; font-size:12px; color:var(--text-muted);">
+          <span><span class="keycap">WASD</span> 이동</span>
+          <span><span class="keycap">E</span> 상호작용</span>
+          <span><span class="keycap">SPACE</span> 회피/견제</span>
+          <span><span class="keycap">ESC</span> 창 닫기</span>
+        </div>
+      </footer>
+    </section>
+
+  </div>
+
+<script>
+  function showScreen(id, btn) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.preview-nav button').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+    document.getElementById('meta-label').textContent = 'PREVIEW: ' + btn.textContent;
+  }
+</script>
+</body>
+</html>

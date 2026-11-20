@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>교사용 · 진행 중</title>
+<link rel="stylesheet" href="system.css">
+<style>
+body{width:1440px;height:900px;overflow:hidden;font-size:14px}
+.screen{height:100%;display:grid;grid-template-rows:52px auto 1fr}
+header{display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid var(--line)}
+header .brand{font-family:var(--sys);font-weight:700;font-size:16px}
+header .room{display:flex;align-items:center;gap:10px;color:var(--muted)}
+header .room .sys{color:var(--text);font-size:16px;letter-spacing:.14em}
+header .hright{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--muted)}
+.btn{font-size:14px}
+
+/* 진행 조작: 현재 상태 + 지금 누를 수 있는 버튼만 */
+.control{display:flex;align-items:center;gap:20px;padding:18px 24px;background:var(--surface)}
+.state{display:flex;align-items:baseline;gap:14px}
+.state .pill{font-size:13px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--raised)}
+.state .sys{font-size:40px;line-height:1}
+.control .grow{flex:1}
+.control .sep{width:1px;height:28px;background:var(--line)}
+
+.body{display:grid;grid-template-columns:1fr 400px;min-height:0}
+.left{padding:20px 24px;display:grid;grid-template-rows:auto 1fr;gap:20px;min-height:0;border-right:1px solid var(--line)}
+h3{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px}
+h3 em{font-style:normal;color:var(--faint);font-weight:400}
+
+.score{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:16px;margin-bottom:14px}
+.score .sys{font-size:28px}
+.score .bar{height:6px;border-radius:3px;overflow:hidden;display:flex;background:var(--red)}.score .bar i{width:56.7%;background:var(--blue)}
+.eras{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.era{padding:10px 10px 10px 14px;gap:3px}
+.era::before{width:4px}
+.era .yr{font-size:16px}
+.era .owner{font-size:12px}
+.era .split{margin-top:6px;height:3px}
+.era .nums{display:flex;justify-content:space-between;font-size:13px;margin-top:4px}
+.era .flag{top:8px;right:8px;font-size:10px;padding:0 6px}
+
+.roster{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;min-height:0}
+.roster h3 b{font-weight:700}
+.roster h3.blue b{color:var(--blue)}.roster h3.red b{color:var(--red)}
+.roster ul{list-style:none;display:flex;flex-direction:column}
+.roster li{display:grid;grid-template-columns:10px 1fr auto auto 44px;align-items:center;column-gap:10px;height:32px;padding:0 8px;border-radius:6px}
+.roster li:nth-child(odd){background:var(--surface)}
+.roster li.off{color:var(--faint)}
+.roster .m{font-family:var(--sys);color:var(--muted);font-size:13px}
+.roster .st{font-size:12px;color:#ffd08a}
+.roster .kick{font-size:12px;color:var(--faint);text-align:right}
+.roster li:hover .kick{color:var(--red)}
+
+.right{padding:20px 24px;display:flex;flex-direction:column;gap:22px;min-height:0}
+.raid{background:var(--surface);border-radius:var(--r);overflow:hidden}
+.raid .tabs{display:flex;gap:6px;padding:10px 12px 0}
+.raid .tabs span{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--raised);color:var(--muted)}
+.raid .tabs span.on{background:var(--text);color:var(--bg)}
+.raid .view{position:relative;height:150px;margin:10px 12px 0;border-radius:8px;overflow:hidden}
+.raid .view img{width:100%;height:100%;object-fit:cover;object-position:50% 45%;image-rendering:pixelated}
+.raid .info{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 12px}
+.raid .info .sys{font-size:22px}
+.contam li,.log li{font-size:13px;line-height:1.45}
+.contam{list-style:none;display:flex;flex-direction:column;gap:8px}
+.contam li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 10px;border-radius:8px;background:var(--surface)}
+.contam s{color:var(--alert)} .contam .who{color:var(--faint);font-size:12px}
+.contam .ok{color:var(--muted);font-size:12px;text-align:right}
+.log{gap:8px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 75%,transparent)}
+.log time{font-size:12px}
+
+.toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);font-weight:600;padding:10px 18px;border-radius:10px;box-shadow:0 10px 30px #0008}
+</style>
+</head>
+<body>
+<div class="screen">
+  <header>
+    <span class="brand">2030<span class="muted">_</span></span>
+    <span class="room">입장 코드 <span class="sys">AH7FHG</span> <button class="btn ghost" style="padding:4px 10px;font-size:12px">QR 크게</button></span>
+    <span class="hright"><span><span class="dot live"></span> 연결됨</span><button class="btn ghost">TV 화면 열기 ↗</button></span>
+  </header>
+
+  <section class="control">
+    <div class="state"><span class="pill"><span class="dot live"></span> 진행 중</span><span class="sys">17:42</span><span class="muted">/ 30분</span></div>
+    <span class="sep"></span>
+    <button class="btn">⏸ 멈춤</button>
+    <button class="btn alert">⚠ 오염 경보 발동</button>
+    <span class="grow"></span>
+    <button class="btn danger">■ 종료</button>
+    <button class="btn ghost">↺ 초기화</button>
+  </section>
+
+  <section class="body">
+    <div class="left">
+      <div>
+        <div class="score"><span class="sys c-blue">340</span><span class="bar"><i></i></span><span class="sys c-red">260</span></div>
+        <div class="eras" id="eras"></div>
+      </div>
+      <div class="roster" id="roster"></div>
+    </div>
+    <div class="right">
+      <div>
+        <h3>⚡ 실시간 공격 <em>2건</em></h3>
+        <div class="raid">
+          <div class="tabs"><span class="on">민준 → 서연</span><span>도윤 → 하은</span></div>
+          <div class="view"><img src="game.png" alt=""></div>
+          <div class="info"><span>감전 <b>3</b>/5 · <span class="c-red">15점 탈취</span></span><span class="sys">0:09</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>🧪 오염 기록 <em>가짜 → 진짜</em></h3>
+        <ol class="contam">
+          <li><span>「동백꽃」 시대 <s>1950년대</s> → <b>1930년대</b></span><span class="ok">정화 대기</span><span class="who">지호 → 수아의 방</span></li>
+          <li><span>「서시」 작가 <s>이육사</s> → <b>윤동주</b></span><span class="ok">✓ 정화됨</span><span class="who">현우 → 하은의 방</span></li>
+        </ol>
+      </div>
+      <div style="min-height:0;display:flex;flex-direction:column">
+        <h3>관제 로그</h3>
+        <ol class="log" id="feed"></ol>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast">오염 경보는 1분 동안 진행돼요 · 남은 10분 시점에 자동으로 한 번 더 울려요</div>
+<script src="data.js"></script>
+<script>
+D.renderEras(eras, { compact: true }); D.renderFeed(feed);
+const tag = p => p.raiding ? '⚡ 공격 중' : '';
+roster.innerHTML = ['blue', 'red'].map(team => {
+  const list = D.ROSTER.filter(p => p.team === team);
+  return `<div><h3 class="${team}"><b>${team === 'blue' ? '인류유산 보존관' : '러다이트'}</b><em>접속 ${list.filter(p => p.online).length} / ${list.length}</em></h3><ul>${list.map(p => `<li class="${p.online ? '' : 'off'}"><span class="dot ${p.online ? 'on' : ''}"></span><span>${p.name}</span><span class="st">${tag(p)}</span><span class="m">${p.missions}</span><span class="kick">${p.online ? '퇴장' : ''}</span></li>`).join('')}</ul></div>`;
+}).join('');
+</script>
+</body>
+</html>
