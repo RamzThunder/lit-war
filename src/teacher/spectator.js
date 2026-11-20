@@ -1,15 +1,14 @@
 import Phaser from 'phaser';
 import { map } from '../prototype/map.js';
-import { createTextures } from '../prototype/assets/createTextures.js';
+import { animateCharacter, playShock, createTextures, preloadCharacters, sizeCharacter } from '../prototype/assets/createTextures.js';
 import { drawArchive, drawSabotages, preloadArchive } from '../prototype/scenes/drawArchive.js';
 // Read-only view of one live raid: the defender's archive, both players, shocks.
 // Loaded lazily by the teacher page so Phaser is only fetched once a raid happens.
-const TEAM_TINT = { blue: 0x8fc3ff, red: 0xff9a8f };
 const ROLE_ICON = { attacker: '⚡', defender: '🏃' };
 
 class Spectator extends Phaser.Scene {
   constructor(onReady) { super('Spectator'); this.onReady = onReady; }
-  preload() { preloadArchive(this); }
+  preload() { preloadArchive(this); preloadCharacters(this); }
   create() {
     createTextures(this);
     drawArchive(this);
@@ -28,7 +27,7 @@ class Spectator extends Phaser.Scene {
     for (const role of ['attacker', 'defender']) {
       const who = raid[role];
       const start = who.player ?? (role === 'attacker' ? map.entry : null);
-      const sprite = this.add.sprite(start?.x ?? map.spawn.x, start?.y ?? map.spawn.y, 'player-down-0').setTint(TEAM_TINT[who.team] ?? 0xffffff).setDepth(10).setVisible(Boolean(start));
+      const sprite = sizeCharacter(this.add.sprite(start?.x ?? map.spawn.x, start?.y ?? map.spawn.y, who.team === 'red' ? 'red' : 'blue')).setVisible(Boolean(start));
       const label = this.add.text(0, 0, `${ROLE_ICON[role]} ${who.name}`, { fontSize: '11px', fontFamily: 'sans-serif', color: who.team === 'red' ? '#ffd6d0' : '#d6e8ff', backgroundColor: who.team === 'red' ? '#3d1a1acc' : '#13284acc', padding: { x: 3, y: 1 } }).setOrigin(.5).setDepth(20).setVisible(Boolean(start));
       this.actors[role] = { sprite, label, team: who.team, target: start ? { ...start, direction: 'down', moving: false } : null, receivedAt: 0 };
     }
@@ -45,11 +44,14 @@ class Spectator extends Phaser.Scene {
     if (!actor) return;
     if (defender) this.move('defender', defender);
     const target = actor.sprite;
+    const attacker = this.actors.attacker;
+    playShock(attacker.sprite, attacker.team, 'cast', target, attacker.target?.direction);
+    playShock(target, actor.team, 'hit', attacker.sprite, actor.target?.direction);
     this.cameras.main.shake(250, 0.008);
     const bolt = this.add.text(target.x, target.y - 30, stolen ? `⚡ -${stolen}` : '⚡', { fontSize: '16px', fontFamily: 'sans-serif', color: '#ffe36e', stroke: '#2b1d00', strokeThickness: 3 }).setOrigin(.5).setDepth(30);
     this.tweens.add({ targets: bolt, y: target.y - 56, alpha: 0, duration: 900, onComplete: () => bolt.destroy() });
     let flashes = 0;
-    this.time.addEvent({ delay: 90, repeat: 9, callback: () => { flashes++; if (target.active) target.setTint(flashes % 2 ? 0xfff27a : 0xffffff); if (flashes === 10 && target.active) target.setTint(TEAM_TINT[actor.team]); } });
+    this.time.addEvent({ delay: 90, repeat: 9, callback: () => { flashes++; if (target.active) target.setTint(flashes % 2 ? 0xfff27a : 0xffffff); if (flashes === 10 && target.active) target.clearTint(); } });
   }
   clear() {
     for (const { sprite, label } of Object.values(this.actors)) { sprite.destroy(); label.destroy(); }
@@ -64,8 +66,8 @@ class Spectator extends Phaser.Scene {
       if (!target) continue;
       sprite.x += (target.x - sprite.x) * alpha; sprite.y += (target.y - sprite.y) * alpha;
       const moving = target.moving && performance.now() - actor.receivedAt < 600;
-      sprite.anims.play(`${moving ? 'walk' : 'idle'}-${target.direction ?? 'down'}`, true);
-      label.setPosition(sprite.x, sprite.y - 26);
+      animateCharacter(sprite, actor.team, target.direction ?? 'down', moving);
+      label.setPosition(sprite.x, sprite.y - 38);
       visible.push(sprite);
     }
     // Keep both players in frame: centre on them and zoom to fit with some margin.

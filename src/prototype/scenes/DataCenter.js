@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { map, movementVector, nearestTerminal, isNearDoor, terminalSolid, doorFor, terminalFor } from '../map.js';
-import { characterAnimation, createTextures, preloadCharacters } from '../assets/createTextures.js';
+import { CHARACTER_SCALE, animateCharacter, playShock, createTextures, preloadCharacters, sizeCharacter } from '../assets/createTextures.js';
 import { drawArchive, drawSabotages, preloadArchive } from './drawArchive.js';
 const SHOCK_RANGE = 40;
 export class DataCenter extends Phaser.Scene {
@@ -19,14 +19,16 @@ export class DataCenter extends Phaser.Scene {
     this.overlay = this.add.graphics().setDepth(5);
     this.overlayLabels = [];
     this.sabotageSignature = '';
-    this.player = this.physics.add.sprite(map.spawn.x, map.spawn.y, 'player-down-0').setDepth(10);
-    this.player.body.setSize(14, 11).setOffset(5, 21);
+    this.player = sizeCharacter(this.physics.add.sprite(map.spawn.x, map.spawn.y, this.practiceTeam));
+    const body = this.player.body;
+    body.setSize(14 / CHARACTER_SCALE, 11 / CHARACTER_SCALE);
+    body.setOffset(this.player.displayOriginX - body.sourceWidth / 2, this.player.displayOriginY + 5 / CHARACTER_SCALE);
     this.player.setCollideWorldBounds(true);
     this.physics.world.setBounds(24, 64, map.width - 48, map.height - 88);
     this.physics.add.collider(this.player, this.solids);
     this.physics.add.collider(this.player, this.blockers);
     this.opponent = null;
-    this.nameLabel = this.add.text(this.player.x, this.player.y - 25, '나', { fontSize: '9px', fontFamily: 'sans-serif', color: '#d7fff0', backgroundColor: '#10232c' }).setOrigin(.5).setDepth(20);
+    this.nameLabel = this.add.text(this.player.x, this.player.y - 38, '나', { fontSize: '9px', fontFamily: 'sans-serif', color: '#d7fff0', backgroundColor: '#10232c' }).setOrigin(.5).setDepth(20);
     this.lastSentAt = 0; this.lastSent = '';
     this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,ESC,SPACE');
     this.input.keyboard.on('keydown-E', event => { if (!event.repeat) this.interact(); });
@@ -55,7 +57,16 @@ export class DataCenter extends Phaser.Scene {
     const onShock = ({ detail }) => {
       const victim = this.state.raid?.role === 'defender' ? this.player : this.opponent?.sprite;
       if (this.state.raid?.role === 'defender') { this.player.setVelocity(0); this.cameras.main.shake(300, 0.012); }
-      if (victim) this.zap(victim, detail.stolen);
+      const raid = this.state.raid;
+      if (!raid) return;
+      const attacker = raid.role === 'attacker' ? this.player : this.opponent?.sprite;
+      const attackerTeam = raid.role === 'attacker' ? this.state.me?.team : raid.opponent.team;
+      const victimTeam = raid.role === 'defender' ? this.state.me?.team : raid.opponent.team;
+      if (attacker) playShock(attacker, attackerTeam, 'cast', victim ?? raid.opponent, attacker === this.player ? this.direction : raid.opponent.direction);
+      if (victim) {
+        playShock(victim, victimTeam, 'hit', attacker ?? raid.opponent, victim === this.player ? this.direction : raid.opponent.direction);
+        this.zap(victim, detail.stolen);
+      }
     };
     this.state.events.addEventListener('raid', onRaid);
     this.state.events.addEventListener('raid-end', onRaidEnd);
@@ -137,8 +148,8 @@ export class DataCenter extends Phaser.Scene {
     this.player.setVelocity(v.x, v.y);
     if (v.x || v.y) this.direction = Math.abs(v.x) >= Math.abs(v.y) ? (v.x < 0 ? 'left' : 'right') : (v.y < 0 ? 'up' : 'down');
     const team = this.state.me?.team;
-    this.player.anims.play(characterAnimation(this.state.online ? team : this.practiceTeam, this.direction, v.x || v.y), true);
-    this.nameLabel.setVisible(Boolean(this.state.online)).setPosition(this.player.x, this.player.y - 25).setText(this.state.online ? `${this.state.name} (나)` : '나');
+    animateCharacter(this.player, this.state.online ? team : this.practiceTeam, this.direction, v.x || v.y, open && terminalFor(this.state.snapshot.terminal));
+    this.nameLabel.setVisible(Boolean(this.state.online)).setPosition(this.player.x, this.player.y - 38).setText(this.state.online ? `${this.state.name} (나)` : '나');
     this.nameLabel.setColor(team === 'red' ? '#ffc9c2' : team === 'blue' ? '#cfe4ff' : '#d7fff0');
     // Positions travel only during a live raid, at most 10 Hz and only when changed.
     if (raid && this.state.connected && time - this.lastSentAt >= 100) {
@@ -150,7 +161,7 @@ export class DataCenter extends Phaser.Scene {
     const peer = raid?.opponent;
     if (peer && !this.opponent) {
       this.opponent = {
-        sprite: this.add.sprite(peer.x ?? map.entry.x, peer.y ?? map.entry.y, 'player-down-0').setDepth(9).setVisible(peer.x != null),
+        sprite: sizeCharacter(this.add.sprite(peer.x ?? map.entry.x, peer.y ?? map.entry.y, peer.team === 'red' ? 'red' : 'blue')).setVisible(peer.x != null),
         label: this.add.text(0, 0, `${raid.role === 'attacker' ? '🎯' : '⚡'} ${peer.name}`, { fontSize: '9px', fontFamily: 'sans-serif', color: '#ffe0a8', backgroundColor: '#2a1d10' }).setOrigin(.5).setDepth(20).setVisible(peer.x != null),
       };
     }
@@ -160,8 +171,8 @@ export class DataCenter extends Phaser.Scene {
       const alpha = 1 - Math.exp(-delta / 65);
       sprite.x += (peer.x - sprite.x) * alpha; sprite.y += (peer.y - sprite.y) * alpha;
       const moving = peer.moving && performance.now() - (peer.receivedAt ?? 0) < 600;
-      sprite.anims.play(characterAnimation(peer.team, peer.direction ?? 'down', moving), true);
-      label.setPosition(sprite.x, sprite.y - 25);
+      animateCharacter(sprite, peer.team, peer.direction ?? 'down', moving);
+      label.setPosition(sprite.x, sprite.y - 38);
     }
     const target = this.target();
     const inRange = raid?.role === 'attacker' && peer?.x != null && Math.hypot(this.player.x - peer.x, this.player.y - peer.y) <= SHOCK_RANGE;

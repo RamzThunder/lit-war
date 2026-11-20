@@ -13,6 +13,7 @@ export function bindUI(state) {
   const dialog = $('#terminal');
   bindFrequency(state); bindRepair(state); bindSabotage(state); bindNewMissions(state); bindContam(state);
   const hudTick = bindHud(state);
+  let terminalReveal = null;
   let selected = null, previousRound = null, records = [];
   const close = () => { cancelDrag(); selected = null; state.closeTerminal(); };
   $('#close-terminal').addEventListener('click', close);
@@ -119,7 +120,16 @@ export function bindUI(state) {
         return line;
       }));
     }
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open && terminalReveal === null) {
+      // Let the player settle at the controls before the modal covers the scene.
+      terminalReveal = setTimeout(() => {
+        terminalReveal = null;
+        if (state.snapshot.terminalOpen && state.snapshot.terminal && !dialog.open) dialog.showModal();
+      }, 500);
+    } else if (!open && terminalReveal !== null) {
+      clearTimeout(terminalReveal);
+      terminalReveal = null;
+    }
     if (!open && dialog.open) { cancelDrag(); dialog.close(); $('#game').focus({ preventScroll: true }); }
   });
   let lastContext = '';
