@@ -1,3 +1,4 @@
+import qrcode from 'qrcode-generator';
 import { ERAS, eraLabel } from '../prototype/minigames/wiring.js';
 import { teamName, teamShort } from '../prototype/teams.js';
 // Draft teacher / TV dashboard. Connects to the same room socket with role=teacher.
@@ -41,7 +42,8 @@ function handle(event) {
     case 'teacher-welcome':
       retry = 0; store.set('teacher-room', room); store.set('teacher-key', key);
       $('#join').hidden = true; $('#dash').hidden = false;
-      $('#room-label').textContent = `ROOM ${room}`;
+      $('#room-label').textContent = `입장 코드 ${room}`;
+      renderEntryInfo();
       $('#conn').textContent = '연결됨'; $('#conn').className = 'conn ok';
       Object.assign(view, { scores: event.scores, roster: event.roster, feed: event.feed });
       setLesson(event.lesson); renderAll();
@@ -81,6 +83,7 @@ function handle(event) {
   }
 }
 function setLesson(lesson) {
+  if (lesson.phase !== view.lesson?.phase) view.entryPinned = null;
   view.lesson = lesson; view.endsAt = lesson.left == null ? null : performance.now() + lesson.left;
   view.eventEndsAt = lesson.event ? performance.now() + lesson.event.left : null;
 }
@@ -106,7 +109,7 @@ function renderLesson() {
   $('#resume').hidden = phase !== 'paused';
   $('#end').hidden = idle;
   $('#event').hidden = phase !== 'playing'; $('#event').disabled = Boolean(view.lesson.event);
-  renderTimer();
+  renderTimer(); renderEntry();
 }
 function renderScores() {
   const scores = view.scores; if (!scores) return;
@@ -126,6 +129,7 @@ function renderScores() {
 function renderRoster() {
   const online = view.roster.filter(p => p.online);
   $('#online-count').textContent = `접속 ${online.length} / 전체 ${view.roster.length}`;
+  renderEntry();
   for (const team of ['blue', 'red']) {
     const list = view.roster.filter(p => p.team === team).sort((a, b) => b.online - a.online || b.missions - a.missions);
     $(`#count-${team}`).textContent = `${list.filter(p => p.online).length}명 접속`;
@@ -238,6 +242,28 @@ function renderContam() {
   }));
 }
 
+// ---- student entry (code + QR on the classroom TV) -------------------------------------
+// Students can only join rooms a teacher opened, so the TV is how they find the room.
+// The big panel shows itself while waiting to start; the teacher can toggle it any time.
+const joinUrl = () => { const url = new URL('/', location.href); url.searchParams.set('room', room); return url.href; };
+function renderEntryInfo() {
+  const qr = qrcode(0, 'M'); qr.addData(joinUrl()); qr.make();
+  $('#entry-qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+  $('#entry-code').textContent = room;
+  $('#entry-url').textContent = new URL('/', location.href).host;
+  $('#entry-toggle').hidden = false;
+}
+function renderEntry() {
+  const phase = view.lesson?.phase;
+  const auto = phase === 'lobby' || phase === 'free';
+  const show = view.entryPinned ?? auto;
+  $('#entry').hidden = !show;
+  $('#entry-toggle').textContent = show ? '입장 안내 숨기기' : '📱 입장 안내';
+  const online = view.roster.filter(p => p.online).length;
+  $('#entry-count').textContent = `지금 ${online}명 입장`;
+}
+$('#entry-toggle').addEventListener('click', () => { view.entryPinned = $('#entry').hidden; renderEntry(); });
+
 function renderAll() { renderLesson(); renderScores(); renderRoster(); renderFeed(); }
 setInterval(renderTimer, 250);
 
@@ -253,6 +279,12 @@ $('#join-form').addEventListener('submit', event => {
   room = $('#room').value.trim().toUpperCase(); key = $('#key').value;
   $('#join-error').textContent = ''; retry = 0;
   socket?.close(); connect();
+});
+// Random code without look-alike characters (0/O, 1/I/L) so students can type it from the TV.
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+$('#new-room').addEventListener('click', () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  $('#room').value = [...bytes].map(b => CODE_CHARS[b % CODE_CHARS.length]).join('');
 });
 $('#room').value = params.get('room') ?? store.get('teacher-room') ?? '';
 const savedKey = store.get('teacher-key');

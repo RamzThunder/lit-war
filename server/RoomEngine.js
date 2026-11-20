@@ -44,6 +44,9 @@ export class RoomEngine {
     const all = count([...this.profiles.values()].map(p => p.team));
     return all[0] <= all[1] ? 'blue' : 'red';
   }
+  // Students enter only rooms a teacher has opened; the classroom TV shows the code and QR.
+  get open() { return Boolean(this.lesson.keyHash); }
+  assertOpen() { if (!this.open) throw new Error('아직 열리지 않은 방이에요. 교실 TV에 나온 방 코드를 확인하세요.'); }
   join(id, name, token, now = Date.now()) {
     if (this.sessions.size >= MAX_PLAYERS) throw new Error('방 인원이 30명으로 가득 찼습니다.');
     if ([...this.sessions.values()].some(s => s.name === name && s.token !== token)) throw new Error('이미 사용 중인 닉네임입니다.');

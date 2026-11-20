@@ -178,6 +178,16 @@ test('hibernation restore keeps open rounds and profiles', () => {
   assert.equal(restored.me('a').team, room.me('a').team);
   assert.equal(restored.restore({ id: 'x', name: 'X', token: 'missing', game: {} }), false);
 });
+test('students can enter only after a teacher opens the room', () => {
+  const room = new RoomEngine();
+  assert.equal(room.open, false);
+  assert.throws(() => room.assertOpen(), /아직 열리지 않은 방/);
+  room.joinTeacher('t', 'hash', 0);
+  assert.equal(room.open, true);
+  assert.doesNotThrow(() => room.assertOpen());
+  const restored = new RoomEngine({ lesson: room.lesson });
+  assert.equal(restored.open, true, 'opened state survives a restart');
+});
 test('teacher claims room: lobby blocks missions, start/pause/resume/end timer, wrong key rejected', () => {
   const room = new RoomEngine({}, () => .92);
   room.join('a', 'A', 'ta', 0);

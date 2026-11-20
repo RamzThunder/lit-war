@@ -79,7 +79,7 @@ export class Classroom extends DurableObject {
     this.ctx.acceptWebSocket(server);
     for (const [id, s] of this.room.sessions) if (s.token === token) this.remove(id, 4000, 'Reconnected');
     const id = crypto.randomUUID();
-    try { this.room.join(id, name, token); }
+    try { this.room.assertOpen(); this.room.join(id, name, token); }
     catch (error) { this.send(server, { type: 'error', fatal: true, message: error.message }); server.close(4001, 'Join rejected'); return new Response(null, { status: 101, webSocket: client }); }
     this.sockets.set(id, server);
     server.serializeAttachment(this.room.serialize(id));

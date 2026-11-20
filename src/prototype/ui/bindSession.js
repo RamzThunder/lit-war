@@ -23,4 +23,11 @@ export function bindSession(state) {
     wasConnected = session.connected;
   });
   dialog.addEventListener('close', () => document.querySelector('#game').focus({ preventScroll: true }));
+  // QR / link from the classroom TV: /?room=CODE opens the dialog with the code filled in.
+  const linked = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
+  if (linked && /^[A-Z0-9]{4,12}$/.test(linked)) {
+    document.querySelector('#room-code').value = linked;
+    dialog.showModal();
+    document.querySelector('#nickname').focus();
+  }
 }

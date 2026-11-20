@@ -20,6 +20,16 @@ async function connect(name, code = room, token = crypto.randomUUID()) {
   }};
   clients.push(client); return client;
 }
+// Students may join only rooms a teacher opened, so each test room is opened and started first.
+async function openRoom(code = room) {
+  const socket = new WebSocket(`${base}/api/rooms/${code}?role=teacher&key=testkey`);
+  const messages = []; socket.addEventListener('message', e => messages.push(JSON.parse(e.data)));
+  const end = Date.now() + 8000;
+  while (!messages.some(m => m.type === 'teacher-welcome')) { if (Date.now() > end) throw new Error(`Timeout: teacher welcome; received ${JSON.stringify(messages)}`); await delay(15); }
+  socket.send(JSON.stringify({ type: 'start', minutes: 30 }));
+  while (!messages.some(m => m.type === 'lesson' && m.lesson.phase === 'playing')) { if (Date.now() > end) throw new Error('Timeout: lesson start'); await delay(15); }
+  clients.push({ socket });
+}
 async function mission(client, era) {
   client.send({ type: 'open', era, ...near(era) });
   let round = (await client.wait('state', m => m.state.terminal === era)).state.round;
@@ -51,6 +61,9 @@ async function mission(client, era) {
   client.send({ type: 'close' }); await client.wait('state', m => !m.state.terminalOpen);
 }
 try {
+  const early = await connect('먼저온학생');
+  assert.match((await early.wait('error', m => m.fatal)).message, /아직 열리지 않은 방/, 'students cannot create rooms');
+  await openRoom(); await openRoom(`${room}X`);
   const a = await connect('학생A'); const wa = await a.wait('welcome');
   const b = await connect('학생B'); const wb = await b.wait('welcome');
   assert.notEqual(wa.me.team, wb.me.team, 'teams alternate');
@@ -92,7 +105,7 @@ try {
   const duplicate = await connect('학생B'); assert.equal((await duplicate.wait('error')).fatal, true);
   for (let i = 2; i < 30; i++) { const client = await connect(`학생${i}`); const welcome = await client.wait('welcome'); assert.equal(welcome.players.length, i + 1); }
   const extra = await connect('초과인원'); assert.equal((await extra.wait('error')).fatal, true);
-  const blues = clients.filter(c => c.socket.readyState === WebSocket.OPEN && c !== other && c !== duplicate && c !== extra).length;
+  const blues = clients.filter(c => c.name && c.socket.readyState === WebSocket.OPEN && c !== other && c !== duplicate && c !== extra).length;
   assert.equal(blues, 30);
   b.socket.close(); await a.wait('left', m => m.id === wb.id);
   const rejoined = await connect('학생B', room, b.token); const welcome = await rejoined.wait('welcome');
