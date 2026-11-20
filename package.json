@@ -15,7 +15,9 @@
     "test:multiplayer": "node scripts/test-multiplayer.js"
   },
   "dependencies": {
+    "galmuri": "2.40.3",
     "phaser": "3.90.0",
+    "pretendard": "1.3.9",
     "qrcode-generator": "2.0.4"
   },
   "devDependencies": {

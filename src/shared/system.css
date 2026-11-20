@@ -1,0 +1,56 @@
+/* 2030 데이터 점령전 · 공용 디자인 체계 (docs/design/v2).
+   상자 대신 여백·면 밝기로 나누고, 색은 팀 2색 + 경보 노랑만 의미 있는 곳에 쓴다.
+   갈무리(픽셀)는 숫자·코드·시스템 표기에만, 문장은 Pretendard.
+   전역 초기화는 하지 않는다: 각 페이지가 이 토큰과 부품만 가져다 쓴다. */
+@font-face{font-family:'Galmuri11';font-weight:400;font-display:swap;src:url('./fonts/Galmuri11.woff2') format('woff2')}
+@font-face{font-family:'Galmuri11';font-weight:700;font-display:swap;src:url('./fonts/Galmuri11-Bold.woff2') format('woff2')}
+
+:root{
+  --bg:#0c1016; --surface:#141a22; --raised:#1b2330; --line:#252e3b;
+  --text:#edf1f6; --muted:#8792a3; --faint:#566173;
+  --blue:#5ea8ff; --blue-dim:#5ea8ff1f; --red:#ff6f61; --red-dim:#ff6f611f;
+  /* 경보색 = 노랑: 오염 경보·오염·접전에만. 공격(감전)은 빨강 */
+  --alert:#f0c65d; --alert-dim:#f0c65d1f; --alert-ink:#2b2205;
+  --sys:'Galmuri11',monospace;
+  --ui:'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  --r:12px; --r-sm:8px;
+}
+.sys{font-family:var(--sys);font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.sys-light{font-family:var(--sys);font-weight:400;letter-spacing:.04em}
+.c-blue{color:var(--blue)} .c-red{color:var(--red)} .c-alert{color:var(--alert)} .c-muted{color:var(--muted)}
+
+/* 상태 표시등 */
+.dot{display:inline-block;width:.5em;height:.5em;border-radius:50%;background:var(--faint);vertical-align:.1em;flex:none}
+.dot.on{background:var(--text)} .dot.live{background:var(--text);animation:sys-blink 2s steps(2) infinite}
+.dot.blue{background:var(--blue)} .dot.red{background:var(--red)} .dot.alert{background:var(--alert)}
+@keyframes sys-blink{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.dot.live{animation:none}}
+
+/* 시스템 줄 */
+.sysline{display:flex;gap:2em;align-items:center;font-family:var(--sys);color:var(--faint);letter-spacing:.08em}
+.sysline b{color:var(--muted);font-weight:400}
+
+/* 기록 보관소 지도의 시대 칸. 팀 색은 왼쪽 띠와 라벨에만 */
+.era-tile{color:var(--text);position:relative;background:var(--surface);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.era-tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--line)}
+.era-tile.blue::before{background:var(--blue)} .era-tile.red::before{background:var(--red)}
+.era-tile.tie::before{background:repeating-linear-gradient(var(--blue) 0 8px,var(--red) 8px 16px)}
+.era-tile .owner{font-weight:600}
+.era-tile.blue .owner{color:var(--blue)} .era-tile.red .owner{color:var(--red)} .era-tile.empty .owner,.era-tile.tie .owner{color:var(--muted)}
+.era-tile .split{display:flex;height:4px;border-radius:2px;overflow:hidden;background:var(--red)}
+.era-tile .split i{background:var(--blue)} .era-tile.empty .split{background:var(--line)}
+.era-tile .nums{display:flex;justify-content:space-between}
+.era-tile .flags{position:absolute;display:flex;gap:6px}
+.era-tile .flag{font-family:var(--sys);border-radius:99px;white-space:nowrap}
+.era-tile .flag.contam{background:var(--alert);color:var(--alert-ink)}
+.era-tile .flag.close{color:var(--alert);box-shadow:inset 0 0 0 1.5px var(--alert)}
+
+/* 관제 로그 */
+.sys-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.sys-log li{color:var(--text);display:grid;grid-template-columns:auto 1fr;column-gap:1em;align-items:baseline;padding-left:.8em;border-left:3px solid var(--line)}
+.sys-log li.blue{border-color:var(--blue)} .sys-log li.red{border-color:var(--red)} .sys-log li.lesson{border-color:var(--alert)}
+.sys-log time{font-family:var(--sys);color:var(--faint);letter-spacing:.04em}
+
+/* 경보 띠: 이벤트 때만. 미세한 주사선으로 '신호 간섭' */
+.alertband{background:var(--alert-dim);border-radius:var(--r);position:relative;overflow:hidden}
+.alertband::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,#f0c65d10 0 1px,transparent 1px 4px);pointer-events:none}

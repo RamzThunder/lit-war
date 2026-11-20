@@ -349,6 +349,7 @@ test('contamination alert: luddite bait (one try) lands in a guardian room, guar
   assert.equal(contam.truth, undefined, 'the answer is not sent to clients');
   assert.ok(contam.options.includes(truth));
   assert.equal(room.teacherWelcome(2000).contam[0].status, 'planted');
+  assert.equal(room.teacherWelcome(2000).contam[0].era, contam.era, 'contam log names the era so screens can flag it');
   const blue = room.scores['1920'].blue;
   const fixed = room.command(victimId, { type: 'cleanse', id: contam.id, value: truth, ...near(contam.era) }, 3000);
   assert.equal(data(fixed, 'cleanse-result', victimId).correct, true);

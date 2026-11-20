@@ -3,102 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a121b">
-  <title>2030 · 교사용 화면</title>
-  <link rel="stylesheet" href="/src/teacher/teacher.css">
+  <meta name="theme-color" content="#0c1016">
+  <title>2030 · 수업 관제 콘솔</title>
 </head>
 <body>
   <header>
-    <b class="brand">2030<span>_</span></b>
-    <span class="title">교사용 화면</span>
+    <span class="brand sys">2030<span>_</span></span>
+    <span class="title">수업 관제 콘솔</span>
     <span id="room-label" class="room"></span>
-    <span id="conn" class="conn">접속 전</span>
-    <button id="entry-toggle" type="button" class="ghost teacher-only" hidden>📱 입장 안내</button>
-    <button id="tv-toggle" type="button" class="ghost">TV 모드</button>
+    <span class="hright"><span id="conn" class="conn">접속 전</span><button id="open-tv" type="button" class="btn" hidden>📺 TV 화면 열기 ↗</button></span>
   </header>
 
-  <section id="join" class="panel join">
+  <section id="join" class="join">
     <h1>교실 열기</h1>
-    <p>학생은 선생님이 연 방에만 들어올 수 있어요. 방을 열면 교실 TV에 방 코드와 QR 코드가 나오고, 학생들은 그걸 보고 입장합니다. 처음 들어가면 입력한 비밀번호가 이 방의 교사 비밀번호가 됩니다.</p>
+    <p>학생은 선생님이 연 방에만 들어올 수 있어요. 방을 열고 <b>📺 TV 화면 열기</b>를 누르면 교실 TV에 방 코드와 QR 코드가 나와요. 처음 들어가면 입력한 비밀번호가 이 방의 교사 비밀번호가 됩니다.</p>
     <form id="join-form">
-      <label>방 코드 <span class="room-row"><input id="room" required minlength="4" maxlength="12" pattern="[A-Za-z0-9]{4,12}" placeholder="CLASS301" autocomplete="off"><button id="new-room" type="button" class="ghost">새 코드</button></span></label>
+      <label>방 코드 <span class="room-row"><input id="room" required minlength="4" maxlength="12" pattern="[A-Za-z0-9]{4,12}" placeholder="CLASS301" autocomplete="off"><button id="new-room" type="button" class="btn ghost">새 코드</button></span></label>
       <label>교사 비밀번호 <input id="key" type="password" required minlength="4" maxlength="32" placeholder="4자 이상"></label>
-      <button type="submit">들어가기</button>
+      <button type="submit" class="btn primary">들어가기</button>
       <p id="join-error" class="error" role="alert"></p>
     </form>
   </section>
 
   <main id="dash" hidden>
-    <section id="entry" class="panel entry" hidden>
-      <div id="entry-qr" class="entry-qr" role="img" aria-label="학생 입장 QR 코드"></div>
-      <div class="entry-text">
-        <h2>학생 입장</h2>
-        <p>휴대폰·크롬북으로 QR 코드를 찍거나, 아래 주소에서 <b>교실 입장</b>을 누르고 방 코드를 입력하세요.</p>
-        <strong id="entry-code" class="entry-code"></strong>
-        <span id="entry-url" class="entry-url"></span>
-        <span id="entry-count" class="entry-count"></span>
+    <aside class="col left">
+      <div class="card state">
+        <span id="phase" class="pill">시작 대기</span>
+        <span id="timer" class="sys">--:--</span>
+        <div class="progress"><i id="progress"></i></div>
+        <p id="state-note"></p>
+        <span id="event-chip" class="chip alert" hidden></span>
+        <span id="opening-chip" class="chip" hidden></span>
       </div>
-    </section>
-    <section class="top">
-      <div class="clock panel">
-        <span id="phase" class="phase">대기</span>
-        <strong id="timer">--:--</strong>
-        <div class="controls teacher-only">
-          <button id="opening" type="button" class="film">🎬 오프닝 재생</button>
-          <label>시간 <input id="minutes" type="number" min="1" max="90" value="30">분</label>
-          <button id="start" type="button">▶ 시작</button>
-          <button id="force-start" type="button" class="ghost" hidden>기다리지 않고 시작</button>
-          <button id="pause" type="button">⏸ 멈춤</button>
-          <button id="resume" type="button">▶ 계속</button>
-          <button id="end" type="button" class="danger">■ 종료</button>
-          <button id="reset" type="button" class="ghost">↺ 초기화</button>
-          <button id="event" type="button" class="alert">⚠️ 오염 경보</button>
+      <div>
+        <h3>진행 조작</h3>
+        <div class="controls">
+          <button id="opening" type="button" class="btn">🎬 오프닝 재생</button>
+          <label id="minutes-row" class="minutes">수업 시간 <input id="minutes" type="number" min="1" max="90" value="30"> 분</label>
+          <button id="start" type="button" class="btn primary">▶ 시작</button>
+          <button id="force-start" type="button" class="btn ghost" hidden>기다리지 않고 시작</button>
+          <button id="pause" type="button" class="btn">⏸ 잠시 멈춤</button>
+          <button id="resume" type="button" class="btn primary">▶ 계속</button>
+          <button id="event" type="button" class="btn alert">⚠ 오염 경보 발동 (1분)</button>
+          <hr>
+          <div class="row"><button id="end" type="button" class="btn danger">■ 종료</button><button id="reset" type="button" class="btn ghost">↺ 초기화</button></div>
         </div>
-        <span id="event-chip" class="event-chip" hidden></span>
-        <span id="opening-chip" class="opening-chip" hidden></span>
       </div>
-      <div class="totals panel">
-        <div class="team blue"><span id="name-blue">인류유산 보존관</span><strong id="total-blue">0</strong><small id="count-blue">0명</small></div>
-        <div class="vs">VS</div>
-        <div class="team red"><span id="name-red">러다이트</span><strong id="total-red">0</strong><small id="count-red">0명</small></div>
+      <div>
+        <h3>학생 입장 <em>QR · 코드</em></h3>
+        <div class="entry"><div class="qr" id="entry-qr"></div><div><span class="sys" id="entry-code"></span><span><button id="qr-big" type="button" class="link">QR 크게 보기</button> · <button id="copy-code" type="button" class="link">코드 복사</button></span></div></div>
       </div>
+      <p class="note">TV 화면은 보기 전용이에요. 버튼이 없고 이 화면과 같은 내용을 크게 보여 줘요.</p>
+    </aside>
+
+    <section class="col center">
+      <div class="score"><span class="sys c-blue" id="total-blue">0</span><span class="bar" id="tug"><i></i></span><span class="sys c-red" id="total-red">0</span><small id="lead"></small></div>
+      <div class="eras" id="eras"></div>
+      <div class="rhead"><span><b>학생</b> · 가나다순</span><span id="online-count"></span></div>
+      <div class="roster"><div><h3 class="blue"><b class="team-name" data-team="blue"></b><em id="count-blue"></em></h3><ul id="roster-blue"></ul></div><div><h3 class="red"><b class="team-name" data-team="red"></b><em id="count-red"></em></h3><ul id="roster-red"></ul></div></div>
     </section>
 
-    <section id="arena-panel" class="panel arena-panel" hidden>
-      <div class="arena-head">
-        <h2>⚡ 실시간 공격 중계</h2>
-        <div id="arena-tabs" class="arena-tabs"></div>
+    <aside class="col right">
+      <div id="arena-panel" class="offstage">
+        <h3>⚡ 실시간 공격 <em id="raid-count"></em></h3>
+        <div class="card raid">
+          <div class="tabs" id="arena-tabs"></div>
+          <div class="arena" id="arena"></div>
+          <div class="info"><span id="arena-stats"></span><span class="sys" id="arena-timer">15</span></div>
+          <div class="result" id="arena-result" hidden></div>
+        </div>
       </div>
-      <div class="arena-banner" aria-live="polite">
-        <span id="arena-title"></span>
-        <span id="arena-stats"></span>
-        <strong id="arena-timer">15</strong>
+      <div id="contam-panel" hidden>
+        <h3>🧪 오염 기록 <em>가짜 → 진짜</em></h3>
+        <ol class="contam" id="contam-log"></ol>
       </div>
-      <div id="arena" class="arena"></div>
-      <div id="arena-result" class="arena-result" hidden></div>
-    </section>
-
-    <section id="contam-panel" class="panel contam-panel" hidden>
-      <h2>🧪 오염 기록 <small>가짜 → 진짜</small></h2>
-      <ol id="contam-log" class="contam-log"></ol>
-    </section>
-
-    <section class="panel">
-      <h2>시대별 점령 현황</h2>
-      <div id="eras" class="eras"></div>
-    </section>
-
-    <section class="bottom">
-      <div class="panel">
-        <h2>학생 <small id="online-count"></small></h2>
-        <div class="roster"><ul id="roster-blue" class="blue"></ul><ul id="roster-red" class="red"></ul></div>
+      <div class="logwrap">
+        <h3>관제 로그</h3>
+        <ol class="sys-log log" id="feed"></ol>
       </div>
-      <div class="panel">
-        <h2>실시간 소식</h2>
-        <ol id="feed" class="feed"></ol>
-      </div>
-    </section>
+    </aside>
   </main>
+
+  <div id="menu" class="menu" hidden><button type="button" id="menu-kick">이 학생 퇴장시키기</button></div>
+  <dialog id="qr-dialog" class="qr-dialog"><div class="qr" id="qr-dialog-code"></div><div><span class="sys" id="qr-dialog-room"></span><p id="qr-dialog-host"></p><button type="button" class="btn" id="qr-close">닫기</button></div></dialog>
   <div id="toast" class="toast" role="alert" hidden></div>
   <script type="module" src="/src/teacher/teacher.js"></script>
 </body>

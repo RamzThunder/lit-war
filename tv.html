@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1016">
+  <title>2030 · 교실 TV</title>
+</head>
+<body>
+  <!-- Login only when opened directly (the teacher console passes the room on its own). -->
+  <section id="login" class="login" hidden>
+    <h1>교실 TV 화면</h1>
+    <p>교사 화면과 같은 방 코드와 교사 비밀번호를 입력하세요. 이 화면은 보기 전용이라 버튼이 없어요.</p>
+    <form id="login-form">
+      <label>방 코드 <input id="room" required minlength="4" maxlength="12" pattern="[A-Za-z0-9]{4,12}" autocomplete="off"></label>
+      <label>교사 비밀번호 <input id="key" type="password" required minlength="4" maxlength="32"></label>
+      <button type="submit">TV 화면 열기</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="frame" class="frame" hidden>
+    <div id="stage" class="stage">
+      <!-- 입장 대기 · 오프닝 상영 -->
+      <section id="lobby" class="screen lobby" hidden>
+        <div class="sysline"><span><b>HUMAN ARCHIVE NET</b> · <span id="lobby-sector">기록원 소집</span></span><span><span class="dot live"></span> <span id="lobby-state">대기 중</span> · <span class="clock-now"></span></span></div>
+        <div class="center">
+          <div class="qr" id="lobby-qr"></div>
+          <div>
+            <div class="eyebrow">2030 현대문학사 데이터 점령전</div>
+            <h1 id="lobby-title">기록원 접속을 기다리는 중</h1>
+            <div class="code"><span>입장 코드</span><span class="sys" id="lobby-code"></span></div>
+            <div class="url">QR을 찍거나 <b id="lobby-host"></b> → 교실 입장</div>
+            <div class="foot"><span class="dot live"></span> <span id="lobby-foot">모두 들어오면 선생님이 오프닝을 시작해요. 영상은 각자 기기에서 나와요.</span></div>
+          </div>
+        </div>
+        <div class="teams">
+          <div class="team blue"><h2><span class="sys" id="count-blue">0</span><span class="team-name" data-team="blue"></span></h2><div class="names" id="names-blue"></div></div>
+          <div class="team red"><h2><span class="sys" id="count-red">0</span><span class="team-name" data-team="red"></span></h2><div class="names" id="names-red"></div></div>
+        </div>
+      </section>
+
+      <!-- 진행 중 · 멈춤 · 종료 -->
+      <section id="board" class="screen board" hidden>
+        <div class="sysline"><span><b>HUMAN ARCHIVE NET</b> · SECTOR <span class="sector"></span> · 현대문학 기록 보관소 &nbsp; <span class="dot live"></span> LIVE <span class="clock-now"></span></span><span class="join">늦게 왔다면 <span class="sys" id="board-code"></span><span class="mini-qr" id="board-qr"></span></span></div>
+        <div class="hero">
+          <div class="team blue"><span class="sys c-blue" id="total-blue">0</span><span class="name team-name" data-team="blue"></span><small id="sub-blue"></small></div>
+          <div class="clock"><span class="sys" id="timer">--:--</span><span class="state" id="phase-label"></span></div>
+          <div class="team red"><span class="sys c-red" id="total-red">0</span><span class="name team-name" data-team="red"></span><small id="sub-red"></small></div>
+        </div>
+        <div class="tugwrap"><div class="tug" id="tug"><i></i></div><div class="lead" id="lead"></div></div>
+        <div class="lower">
+          <div class="map"><h2>기록 보관소 지도 <span class="legend"><span class="c-alert">●</span> 접전 = 10점 이내</span></h2><div class="eras" id="eras"></div></div>
+          <div class="side">
+            <div class="alertband" id="alert" hidden><div><b>⚠ 오염 경보</b><p>미끼 심기 · 정화 점수 2배</p></div><span class="sys" id="alert-left">1:00</span></div>
+            <h2>관제 로그</h2>
+            <ol class="sys-log log" id="feed"></ol>
+          </div>
+        </div>
+        <div class="paused" id="paused" hidden><span class="sys">⏸</span><b>잠시 멈춤</b><p>선생님이 다시 시작할 때까지 기다려 주세요</p></div>
+      </section>
+
+      <!-- 실시간 공격 중계 -->
+      <section id="raid" class="screen raid off">
+        <div class="strip"><span>남은 시간 <span class="sys" id="raid-clock">--:--</span></span><span class="sys c-blue" id="raid-blue">0</span><span class="bar" id="raid-tug"><i></i></span><span class="sys c-red" id="raid-red">0</span></div>
+        <div class="headline"><span class="tag"><span class="dot live"></span> 실시간 공격</span><span id="raid-att"></span><span class="arrow">▶ 침입 ▶</span><span id="raid-def"></span><small>의 기록실</small></div>
+        <div class="main">
+          <div class="arena" id="arena"></div>
+          <div class="info">
+            <div class="count"><span class="sys" id="raid-seconds">15</span><span>남은 초</span></div>
+            <div><div class="shocks" id="shocks"></div><p class="label" id="shock-label"></p></div>
+            <div class="stats"><div><span>빼앗긴 점수</span><b class="sys c-red" id="raid-stolen">0</b></div><div><span id="raid-def-name"></span><b id="raid-def-state">도망치는 중</b></div></div>
+            <div class="result" id="raid-result" hidden></div>
+            <p class="queue" id="raid-queue"></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p id="conn" class="conn" hidden></p>
+  <script type="module" src="/src/tv/tv.js"></script>
+</body>
+</html>

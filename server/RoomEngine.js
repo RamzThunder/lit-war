@@ -262,7 +262,7 @@ export class RoomEngine {
       ...reply({ type: 'bait-result', ok: true, name: target.name, truth, fake, message: `미끼 성공! ${target.name}의 방에 심었어요 (+${RULES.baitPoints})` }),
       { to: '*', data: { type: 'scores', scores: this.scores } },
       ...this.#feed(`🧪 ${s.name} → ${target.name}의 방에 미끼 (「${truth.title}」 ${bait.field === 'era' ? '시대' : '작가'} 변조)`, 'red', now),
-      ...this.#logContam({ id, by: s.name, target: target.name, title: truth.title, field: bait.field, fake: message.value, truth: bait.truth, status: 'planted' }),
+      ...this.#logContam({ id, era: bait.era, by: s.name, target: target.name, title: truth.title, field: bait.field, fake: message.value, truth: bait.truth, status: 'planted' }),
     ];
     if (live) out.push({ to: live.id, data: { type: 'contaminated', by: s.name, era: terminalEra, state: this.state(live.id, now) } });
     return out;
