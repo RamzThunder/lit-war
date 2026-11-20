@@ -9,6 +9,7 @@ import { GameState } from '../src/prototype/state/GameState.js';
 import { createExtraRound, extraTarget, COOKING } from '../src/prototype/minigames/extraMissions.js';
 import { frequencyRecords } from '../src/prototype/minigames/frequency.js';
 const near = era => { const t=terminalFor(era); return [-58,50].map(dy=>({x:t.x,y:t.y+dy})).find(p=>validPosition(p.x,p.y)&&isNearTerminal(p,t)); };
+const progress = ({ done, total, ready }) => ({ done, total, ready });
 const data = (out, type, to) => out.find(o => o.data.type === type && (to === undefined || o.to === to))?.data;
 function mission(room, id, era = '1920', now = 1000) {
   room.command(id, { type: 'open', era, ...near(era) }, now);
@@ -188,6 +189,43 @@ test('students can enter only after a teacher opens the room', () => {
   const restored = new RoomEngine({ lesson: room.lesson });
   assert.equal(restored.open, true, 'opened state survives a restart');
 });
+test('opening video: no timer, students report finishing, start waits for everyone online', () => {
+  const room = new RoomEngine({}, () => .92);
+  room.joinTeacher('t', 'hash', 0);
+  room.join('a', 'A', 'ta', 0); room.join('b', 'B', 'tb', 0);
+  assert.equal(data(room.command('a', { type: 'opening-done' }, 0), 'lesson', '*'), undefined, 'ignored outside the opening');
+  const opening = data(room.command('t', { type: 'opening' }, 10), 'lesson', '*').lesson;
+  assert.deepEqual(progress(opening.opening), { done: 0, total: 2, ready: false });
+  assert.equal(opening.left, null, 'timer does not run');
+  assert.equal(room.nextDeadline(), Infinity);
+  assert.equal(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }, 20), 'error').message, '오프닝 영상이 끝나면 선생님이 게임을 시작해요.');
+  assert.deepEqual(progress(data(room.command('a', { type: 'opening-done' }, 30), 'lesson', '*').lesson.opening), { done: 1, total: 2, ready: false });
+  assert.deepEqual(room.command('a', { type: 'opening-done' }, 31), [], 'reported once');
+  assert.match(data(room.command('t', { type: 'start', minutes: 30 }, 40), 'error').message, /1\/2명 완료/);
+  // A reload keeps the finished state; a student who leaves no longer blocks the start.
+  room.remove('a'); room.join('a2', 'A', 'ta', 50);
+  assert.equal(room.welcome('a2', 50).openingWatched, true);
+  const left = room.remove('b', 60);
+  assert.deepEqual(progress(data(left, 'lesson', '*').lesson.opening), { done: 1, total: 1, ready: true });
+  room.join('b2', 'B', 'tb', 70);
+  assert.equal(room.welcome('b2', 70).openingWatched, false);
+  assert.ok(data(room.command('t', { type: 'start', minutes: 30, force: true }, 80), 'lesson', '*'), 'teacher may start without waiting');
+  assert.equal(room.lesson.phase, 'playing'); assert.equal(room.lesson.opening, null);
+});
+test('opening restart clears progress; finishing all students unlocks start', () => {
+  const room = new RoomEngine({}, () => .92);
+  room.joinTeacher('t', 'hash', 0); room.join('a', 'A', 'ta', 0);
+  room.command('t', { type: 'opening' }, 0); room.command('a', { type: 'opening-done' }, 1);
+  assert.equal(room.lessonView(2).opening.ready, true);
+  const firstId = room.lessonView(2).opening.id;
+  room.command('t', { type: 'opening' }, 3);
+  assert.equal(room.lessonView(4).opening.done, 0, 'replay asks everyone to watch again');
+  assert.notEqual(room.lessonView(4).opening.id, firstId, 'replay gets a new id so clients restart the film');
+  assert.equal(data(room.command('t', { type: 'opening' }, 5), 'lesson', '*').lesson.phase, 'opening');
+  room.command('a', { type: 'opening-done' }, 6);
+  assert.equal(data(room.command('t', { type: 'start', minutes: 30 }, 7), 'lesson', '*').lesson.phase, 'playing');
+  assert.equal(data(room.command('t', { type: 'opening' }, 8), 'error').message, '게임 중에는 오프닝을 틀 수 없어요.');
+});
 test('teacher claims room: lobby blocks missions, start/pause/resume/end timer, wrong key rejected', () => {
   const room = new RoomEngine({}, () => .92);
   room.join('a', 'A', 'ta', 0);
@@ -203,7 +241,7 @@ test('teacher claims room: lobby blocks missions, start/pause/resume/end timer, 
   assert.equal(data(room.command('a', { type: 'start' }, 10), 'error').message, '선생님이 게임을 시작하면 할 수 있어요.', 'students cannot send teacher commands');
   assert.equal(data(room.command('t', { type: 'start', minutes: 0 }, 10), 'error').message, '시간은 1~90분 사이로 정하세요.');
   const start = room.command('t', { type: 'start', minutes: 5 }, 1000);
-  assert.deepEqual(data(start, 'lesson', '*').lesson, { phase: 'playing', durationMs: 300000, left: 300000, event: null });
+  assert.deepEqual(data(start, 'lesson', '*').lesson, { phase: 'playing', durationMs: 300000, left: 300000, event: null, opening: null });
   assert.equal(room.nextDeadline(), 151000, 'auto alert at half of a short lesson');
   room.command('a', { type: 'open', era: '1920', ...near('1920') }, 2000);
   const paused = room.command('t', { type: 'pause' }, 61000);

@@ -11,10 +11,26 @@ export default {
       return env.ROOMS.getByName(match[1]).fetch(request);
     }
     if (url.pathname === '/api/health') return Response.json({ ok: true });
+    if (url.pathname.startsWith('/openings/')) return serveVideo(request, env);
     if (url.pathname.startsWith('/api/')) return new Response('Not found', { status: 404 });
     return env.ASSETS.fetch(request);
   },
 };
+// Static assets answer without Range support, but Safari (iPhone/iPad) needs 206 partial
+// responses to play video at all. The opening films are a few MB, so slice them here.
+async function serveVideo(request, env) {
+  const asset = await env.ASSETS.fetch(new Request(request.url, { method: 'GET' }));
+  const range = request.headers.get('Range')?.match(/^bytes=(\d*)-(\d*)$/);
+  const headers = new Headers(asset.headers); headers.set('Accept-Ranges', 'bytes');
+  if (!asset.ok || !range) return new Response(request.method === 'HEAD' ? null : asset.body, { status: asset.status, headers });
+  const body = await asset.arrayBuffer(), size = body.byteLength;
+  let start = range[1] === '' ? size - Number(range[2]) : Number(range[1]);
+  let end = range[1] === '' || range[2] === '' ? size - 1 : Math.min(Number(range[2]), size - 1);
+  start = Math.max(0, start);
+  if (start > end || start >= size) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  headers.set('Content-Range', `bytes ${start}-${end}/${size}`); headers.set('Content-Length', String(end - start + 1));
+  return new Response(request.method === 'HEAD' ? null : body.slice(start, end + 1), { status: 206, headers });
+}
 const HEARTBEAT_MS = 30000;
 const sha256 = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(b => b.toString(16).padStart(2, '0')).join('');
 // One Durable Object per class code. Scores and per-student profiles (team, mission count,
@@ -85,7 +101,7 @@ export class Classroom extends DurableObject {
     server.serializeAttachment(this.room.serialize(id));
     this.send(server, this.room.welcome(id));
     for (const [other, socket] of this.sockets) if (other !== id) this.send(socket, { type: 'joined', player: this.room.player(id) });
-    this.dispatch(this.room.teacherUpdate());
+    this.dispatch([...this.room.teacherUpdate(), ...this.room.openingUpdate()]);
     await this.flush();
     await this.ensureAlarm(Date.now() + HEARTBEAT_MS);
     return new Response(null, { status: 101, webSocket: client });

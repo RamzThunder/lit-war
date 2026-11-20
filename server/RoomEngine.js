@@ -19,10 +19,12 @@ const BLOCKING = new Set(['barricade', 'broken']);
 const recordOf = (era, id) => wiringRecords[era].find(r => r.id === id);
 // Lesson flow. `free` = no teacher has claimed the room yet, so students play right away.
 // Once a teacher connects the room waits in `lobby` until the teacher starts the timer.
-export const PHASES = ['free', 'lobby', 'playing', 'paused', 'ended'];
+// `opening` = students watch their team's opening video; the timer does not run and the
+// teacher can start once every connected student has finished it.
+export const PHASES = ['free', 'lobby', 'opening', 'playing', 'paused', 'ended'];
 const ACTIVE = new Set(['free', 'playing']);
-const newLesson = () => ({ phase: 'free', endsAt: null, remainMs: null, durationMs: null, keyHash: null, event: null, eventFired: false });
-const PHASE_BLOCKED = { lobby: '선생님이 게임을 시작하면 할 수 있어요.', paused: '선생님이 게임을 잠시 멈췄어요.', ended: '게임이 끝났어요.' };
+const newLesson = () => ({ phase: 'free', endsAt: null, remainMs: null, durationMs: null, keyHash: null, event: null, eventFired: false, opening: null });
+const PHASE_BLOCKED = { lobby: '선생님이 게임을 시작하면 할 수 있어요.', opening: '오프닝 영상이 끝나면 선생님이 게임을 시작해요.', paused: '선생님이 게임을 잠시 멈췄어요.', ended: '게임이 끝났어요.' };
 // Room authority. Students roam their own copy of the map without sending positions; the
 // server judges missions, awards team points and attack rights, and relays movement only
 // between the two players of a live raid. command() returns messages as { to, data } where
@@ -76,8 +78,20 @@ export class RoomEngine {
   isTeacher(id) { return this.teachers.has(id); }
   lessonView(now = Date.now()) {
     const { phase, endsAt, remainMs, durationMs, event } = this.lesson;
-    return { phase, durationMs, left: phase === 'playing' ? Math.max(0, endsAt - now) : phase === 'paused' ? remainMs : null, event: event ? { left: Math.max(0, event.endsAt - now) } : null };
+    return { phase, durationMs, left: phase === 'playing' ? Math.max(0, endsAt - now) : phase === 'paused' ? remainMs : null, event: event ? { left: Math.max(0, event.endsAt - now) } : null, opening: phase === 'opening' ? this.openingProgress() : null };
   }
+  // Opening progress counts only students connected right now; finished ones are kept by token
+  // so a reload does not make them watch again.
+  openingProgress() {
+    const done = new Set(this.lesson.opening?.done ?? []);
+    const online = [...this.sessions.values()];
+    const finished = online.filter(s => done.has(s.token)).length;
+    // `id` changes on every replay so clients know to watch again.
+    return { id: this.lesson.opening?.at ?? 0, done: finished, total: online.length, ready: finished === online.length };
+  }
+  openingWatched(token) { return Boolean(this.lesson.opening?.done.includes(token)); }
+  // Joins and leaves change the opening head count; the worker calls this after a join.
+  openingUpdate(now = Date.now()) { return this.lesson.phase === 'opening' ? [this.#lessonMessage(now)] : []; }
   get active() { return ACTIVE.has(this.lesson.phase); }
   roster() {
     const live = new Map([...this.sessions.values()].map(s => [s.token, s]));
@@ -118,7 +132,7 @@ export class RoomEngine {
   }
   #setPhase(phase, now, patch = {}) {
     Object.assign(this.lesson, { phase, ...patch }); this.lessonDirty = true;
-    const label = { playing: '▶ 게임 시작', paused: '⏸ 잠시 멈춤', ended: '■ 게임 종료', lobby: '↺ 대기 상태' }[phase];
+    const label = { opening: '🎬 오프닝 영상 재생', playing: '▶ 게임 시작', paused: '⏸ 잠시 멈춤', ended: '■ 게임 종료', lobby: '↺ 대기 상태' }[phase];
     return [this.#lessonMessage(now), ...this.#feed(label, 'lesson', now)];
   }
   #reset(now) {
@@ -130,7 +144,7 @@ export class RoomEngine {
     this.feedLog = [];
     out.push({ to: '*', data: { type: 'scores', scores: this.scores } });
     for (const id of this.sessions.keys()) out.push({ to: id, data: { type: 'me', me: this.me(id) } });
-    return [...out, ...this.#setPhase('lobby', now, { endsAt: null, remainMs: null }), ...this.teacherUpdate()];
+    return [...out, ...this.#setPhase('lobby', now, { endsAt: null, remainMs: null, opening: null }), ...this.teacherUpdate()];
   }
   #teacherCommand(id, message, now) {
     const t = this.teachers.get(id); t.lastSeen = now;
@@ -142,12 +156,19 @@ export class RoomEngine {
         if (phase !== 'playing') return error('게임이 진행 중일 때만 발동할 수 있어요.');
         if (this.lesson.event) return error('이미 오염 경보가 진행 중이에요.');
         return this.#startEvent(now);
+      case 'opening':
+        if (phase === 'playing' || phase === 'paused') return error('게임 중에는 오프닝을 틀 수 없어요.');
+        return this.#setPhase('opening', now, { endsAt: null, remainMs: null, opening: { done: [], at: now } });
       case 'start': {
         if (phase === 'playing' || phase === 'paused') return error('이미 진행 중이에요.');
+        if (phase === 'opening' && !this.openingProgress().ready && !message.force) {
+          const { done, total } = this.openingProgress();
+          return error(`아직 오프닝 영상을 보는 학생이 있어요. (${done}/${total}명 완료)`);
+        }
         const minutes = Math.round(Number(message.minutes));
         if (!Number.isFinite(minutes) || minutes < 1 || minutes > 90) return error('시간은 1~90분 사이로 정하세요.');
         const durationMs = minutes * 60000;
-        return this.#setPhase('playing', now, { durationMs, endsAt: now + durationMs, remainMs: null, event: null, eventFired: false });
+        return this.#setPhase('playing', now, { durationMs, endsAt: now + durationMs, remainMs: null, event: null, eventFired: false, opening: null });
       }
       case 'pause':
         if (phase !== 'playing') return error('진행 중일 때만 멈출 수 있어요.');
@@ -297,7 +318,7 @@ export class RoomEngine {
   }
   stateMessage(id, now, extra = {}) { return { to: id, data: { type: 'state', state: this.state(id, now), me: this.me(id), ...extra } }; }
   welcome(id, now = Date.now()) {
-    return { type: 'welcome', id, me: this.me(id), players: this.players(), state: this.state(id, now), scores: this.scores, lesson: this.lessonView(now) };
+    return { type: 'welcome', id, me: this.me(id), players: this.players(), state: this.state(id, now), scores: this.scores, lesson: this.lessonView(now), openingWatched: this.openingWatched(this.sessions.get(id)?.token) };
   }
   remove(id, now = Date.now()) {
     if (this.teachers.delete(id)) return [];
@@ -305,7 +326,14 @@ export class RoomEngine {
     if (!s) return [];
     const out = s.raid ? this.#endRaid(s.raid, now, '상대가 접속을 끊어 공격이 끝났습니다.') : [];
     this.sessions.delete(id);
-    return [...out, { to: '*', data: { type: 'left', id } }, ...this.teacherUpdate()];
+    return [...out, { to: '*', data: { type: 'left', id } }, ...this.teacherUpdate(), ...this.openingUpdate(now)];
+  }
+  #openingDone(s, now) {
+    const opening = this.lesson.opening;
+    if (this.lesson.phase !== 'opening' || !opening || opening.done.includes(s.token)) return [];
+    opening.done.push(s.token); this.lessonDirty = true;
+    const progress = this.openingProgress();
+    return [this.#lessonMessage(now), ...(progress.ready ? this.#feed(`🎬 모든 학생이 오프닝을 봤어요 (${progress.total}명)`, 'lesson', now) : [])];
   }
   // ---- clock -----------------------------------------------------------------------------
   tick(now = Date.now()) {
@@ -334,6 +362,7 @@ export class RoomEngine {
     if (message.type === 'ping') return reply({ type: 'pong' });
     if (message.type === 'move') return this.#move(s, message, now);
     if (message.type === 'shock') return this.#shock(s, now);
+    if (message.type === 'opening-done') return this.#openingDone(s, now);
     if (!this.active && message.type !== 'close') return error(PHASE_BLOCKED[this.lesson.phase]);
     if (s.raid && ['open', 'repair', 'raid', 'sabotage-start', 'sabotage', 'cleanse', 'bait'].includes(message.type)) return error('공격이 끝난 뒤에 할 수 있어요.');
     const at = { x: message.x, y: message.y };

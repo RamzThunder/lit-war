@@ -25,6 +25,10 @@ export class SessionState {
       if (lesson.event) this.notice(this.me?.team === 'red' ? '⚠️ 오염 경보! 1분 동안 미션을 깨면 미끼를 심을 수 있어요 (점수 2배)' : '⚠️ 오염 경보! 러다이트가 미끼를 심어요. 오염된 기록을 찾아 정화하세요 (점수 2배)', 'bad');
       else this.notice('오염 경보가 끝났어요.', 'info');
     }
+    // A fresh opening (first time or the teacher replayed it) must be watched again.
+    if (lesson?.opening && lesson.opening.id !== this.openingId) this.openingWatched = false;
+    this.openingId = lesson?.opening?.id;
+    this.emit('lesson', this.lesson);
     if (!announce || !lesson || previous === lesson.phase) return;
     const text = { playing: ['▶ 게임 시작! 단말기에서 미션을 시작하세요.', 'good'], paused: ['⏸ 선생님이 게임을 잠시 멈췄어요.', 'warn'], ended: ['■ 게임 끝! 점령 현황을 확인하세요.', 'warn'], lobby: ['선생님이 시작할 때까지 기다려 주세요.', 'info'] }[lesson.phase];
     if (lesson.phase !== 'playing' && this.remote.terminalOpen) { this.remote.terminalOpen = false; this.remote.round = null; this.publish(); }
@@ -77,6 +81,8 @@ export class SessionState {
           clearTimeout(timeout); this.connected = true; this.retry = 0; this.id = event.id;
           this.players = new Map(event.players.map(player => [player.id, player]));
           this.setRemote(event.state); this.scores = event.scores; this.raid = null;
+          // The server knows whether this student already finished the current opening.
+          this.openingWatched = Boolean(event.openingWatched); this.openingId = event.lesson?.opening?.id;
           this.setLesson(event.lesson, false);
           if (event.lesson?.phase === 'lobby') this.notice('선생님이 시작할 때까지 기다려 주세요.');
           this.status = '연결됨';
@@ -206,6 +212,7 @@ export class SessionState {
     return author === work ? 'correct' : 'incorrect';
   }
   pickRepair(id) { if (this.online) this.send({ type: 'pick', id }); }
+  finishOpening() { if (this.openingWatched) return; this.openingWatched = true; this.send({ type: 'opening-done' }); this.emit('lesson', this.lesson); }
   startRaid() { this.send({ type: 'raid' }); }
   setTrap(era) { this.send({ type: 'trap', era }); }
   plantBait(value) { this.send({ type: 'bait', value }); }

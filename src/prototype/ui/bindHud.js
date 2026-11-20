@@ -79,7 +79,7 @@ export function bindHud(state) {
     const chip = $('#lesson-chip'); chip.hidden = !show;
     if (!show) return;
     const clock = seconds == null ? '' : ` ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-    chip.textContent = { lobby: '⏳ 시작 대기', playing: `⏱${clock}`, paused: `⏸ 멈춤${clock}`, ended: '■ 게임 끝' }[lesson.phase];
+    chip.textContent = { lobby: '⏳ 시작 대기', opening: '🎬 오프닝 영상', playing: `⏱${clock}`, paused: `⏸ 멈춤${clock}`, ended: '■ 게임 끝' }[lesson.phase];
     chip.className = `lesson-chip ${lesson.phase}`;
     if (eventLeft != null) { chip.textContent += ` · ⚠️ 오염 경보 ${eventLeft}초`; chip.classList.add('alert'); }
   };

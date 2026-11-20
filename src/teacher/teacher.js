@@ -3,7 +3,7 @@ import { ERAS, eraLabel } from '../prototype/minigames/wiring.js';
 import { teamName, teamShort } from '../prototype/teams.js';
 // Draft teacher / TV dashboard. Connects to the same room socket with role=teacher.
 const $ = selector => document.querySelector(selector);
-const PHASE_LABEL = { free: '자유 진행', lobby: '시작 대기', playing: '진행 중', paused: '멈춤', ended: '종료' };
+const PHASE_LABEL = { free: '자유 진행', lobby: '시작 대기', opening: '오프닝 상영', playing: '진행 중', paused: '멈춤', ended: '종료' };
 const store = {
   get(key) { try { return sessionStorage.getItem(key); } catch { return null; } },
   set(key, value) { try { sessionStorage.setItem(key, value); } catch { /* private mode */ } },
@@ -103,8 +103,18 @@ function renderTimer() {
 function renderLesson() {
   const { phase } = view.lesson;
   $('#phase').textContent = PHASE_LABEL[phase]; $('#phase').className = `phase ${phase}`;
-  const idle = phase === 'lobby' || phase === 'ended' || phase === 'free';
+  const idle = phase === 'lobby' || phase === 'ended' || phase === 'free' || phase === 'opening';
   $('#start').hidden = !idle; $('#minutes').closest('label').hidden = !idle;
+  // During the opening the timer is stopped; start unlocks once every student finished.
+  const opening = phase === 'opening' ? view.lesson.opening : null;
+  $('#opening').hidden = !idle; $('#opening').textContent = opening ? '🎬 다시 재생' : '🎬 오프닝 재생';
+  $('#start').disabled = Boolean(opening && !opening.ready);
+  $('#force-start').hidden = !opening || opening.ready;
+  $('#opening-chip').hidden = !opening;
+  if (opening) {
+    $('#opening-chip').textContent = opening.ready ? `🎬 모두 시청 완료 (${opening.total}명) · 시작할 수 있어요` : `🎬 오프닝 시청 중 · ${opening.done} / ${opening.total}명 완료`;
+    $('#opening-chip').classList.toggle('ready', opening.ready);
+  }
   $('#pause').hidden = phase !== 'playing';
   $('#resume').hidden = phase !== 'paused';
   $('#end').hidden = idle;
@@ -269,6 +279,11 @@ setInterval(renderTimer, 250);
 
 // ---- controls ------------------------------------------------------------------------
 $('#start').addEventListener('click', () => send({ type: 'start', minutes: Number($('#minutes').value) }));
+$('#opening').addEventListener('click', () => {
+  if (view.lesson?.phase === 'opening' && !confirm('모든 학생의 오프닝 영상을 처음부터 다시 틀까요?')) return;
+  send({ type: 'opening' });
+});
+$('#force-start').addEventListener('click', () => { if (confirm('아직 영상을 보는 학생이 있어요. 기다리지 않고 바로 시작할까요?')) send({ type: 'start', minutes: Number($('#minutes').value), force: true }); });
 $('#pause').addEventListener('click', () => send({ type: 'pause' }));
 $('#resume').addEventListener('click', () => send({ type: 'resume' }));
 $('#end').addEventListener('click', () => { if (confirm('게임을 끝낼까요? 남은 시간이 사라집니다.')) send({ type: 'end' }); });
