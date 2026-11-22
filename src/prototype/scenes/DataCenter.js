@@ -105,7 +105,10 @@ export class DataCenter extends Phaser.Scene {
     this.state.events.addEventListener('shock', onShock);
     const resize = () => {
       const camera = this.cameras.main;
-      camera.setZoom(this.scale.width >= 700 && this.scale.height >= 420 ? 2 : 1);
+      // About 230 world px across the shorter side, in half steps (pixel art stays crisp):
+      // phones in portrait get 1.5x, Chromebooks and larger keep 2x.
+      const short = Math.min(this.scale.width, this.scale.height);
+      camera.setZoom(Math.max(1, Math.min(2, Math.floor(short / 230 * 2) / 2)));
       const width = Math.max(camera.displayWidth, map.width);
       const height = Math.max(camera.displayHeight, map.height);
       camera.setBounds((map.width - width) / 2, (map.height - height) / 2, width, height);
