@@ -3,3 +3,7 @@
 .training-guide span { font-size:13px; line-height:1.5; }
 .training-mini-hint { padding:10px; text-align:center; background:#173342; color:#e0fff4; }
 .guided-training #next-round,.guided-training #use-trap { display:none; }
+.training-team { display:flex; gap:4px; }
+.training-team button[aria-pressed=false] { opacity:.55; }
+.training-team button[aria-pressed=true].blue { background:#2f7fd8; color:#fff; box-shadow:none; }
+.training-team button[aria-pressed=true].red { background:#d8493a; color:#fff; box-shadow:none; }

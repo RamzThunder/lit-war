@@ -2,6 +2,7 @@ import { RoomEngine } from '../server/RoomEngine.js';
 import { GameState } from './prototype/state/GameState.js';
 import { map, doorFor, validPosition } from './prototype/map.js';
 import { wiringRecords } from './prototype/minigames/wiring.js';
+import { TEAM_INFO } from './prototype/teams.js';
 import './tutorial-preview.css';
 
 export function startTraining(state) {
@@ -85,7 +86,25 @@ export function startTraining(state) {
     if (parent !== window) parent.postMessage('training-exit', location.origin);
     else location.assign('./');
   }
-  if (!params.has('required')) button('연습 나가기', exit);
+  // Free practice can switch sides; the required pre-game run keeps the student's real team.
+  if (!params.has('required')) {
+    const picker = document.createElement('div');
+    picker.className = 'training-team'; picker.setAttribute('role', 'group'); picker.setAttribute('aria-label', '연습할 진영');
+    for (const team of ['blue', 'red']) {
+      const el = document.createElement('button');
+      el.type = 'button'; el.className = `s-join ${team}`; el.textContent = TEAM_INFO[team].short;
+      const current = (team === 'red') === red;
+      el.setAttribute('aria-pressed', String(current));
+      el.onclick = () => {
+        if (current) return;
+        const url = new URL(location.href); url.searchParams.set('team', team); url.searchParams.delete('step');
+        location.replace(url);
+      };
+      picker.append(el);
+    }
+    nav.append(picker);
+    button('연습 나가기', exit);
+  }
 
   function startContamination() {
     state.correction = { ...start };
