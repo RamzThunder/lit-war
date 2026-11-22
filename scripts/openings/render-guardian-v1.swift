@@ -44,6 +44,15 @@ func load(_ name:String)->CGImage {
     guard let s=CGImageSourceCreateWithURL(u as CFURL,nil),let im=CGImageSourceCreateImageAtIndex(s,0,nil) else {fatalError("Missing art: \(u.path)")};return im
 }
 let library=load("guardian-library")
+// Fit the original artwork by its visible bounds, with equal margins on both sides.
+func humanArt(_ c:CGContext,_ image:CGImage,_ box:CGRect) {
+    let scale=min(box.width/CGFloat(image.width),box.height/CGFloat(image.height))
+    let w=CGFloat(image.width)*scale,h=CGFloat(image.height)*scale
+    c.saveGState();c.interpolationQuality = .high
+    c.draw(image,in:CGRect(x:box.midX-w/2,y:box.midY-h/2,width:w,height:h));c.restoreGState()
+}
+let humanLogo=load("../identity/human-lockup").cropping(to:CGRect(x:187,y:97,width:1160,height:844))!
+let humanMark=load("../identity/human-mark")
 func color(_ hex:Int,_ a:Double=1)->NSColor {NSColor(calibratedRed:Double((hex>>16)&255)/255,green:Double((hex>>8)&255)/255,blue:Double(hex&255)/255,alpha:a)}
 let ink=color(0x173D4A),cream=color(0xFFF8DC),mint=color(0xA8E9CF),coral=color(0xF26C68),yellow=color(0xFFD66E),blue=color(0x9ECFEF),night=color(0x111D2B),paper=color(0xF4DFB1)
 func clamp(_ x:Double)->Double {min(1,max(0,x))}
@@ -198,13 +207,13 @@ func interruptedSignal(_ c:CGContext,_ u:Double) {
 func draw(_ c:CGContext,_ t:Double) {
     picture(c,library,CGRect(x:0,y:0,width:1280,height:720))
     rect(c,0,0,1280,720,cream.withAlphaComponent(0.36))
-    label(c,scriptText("G013"),50,687,18,ink)
+    rect(c,48,679,33,35,ink);humanArt(c,humanMark,CGRect(x:51,y:682,width:27,height:26));label(c,scriptText("G013"),90,687,18,ink)
     rect(c,48,666,1184,4,ink.withAlphaComponent(0.15));rect(c,48,666,1184*t/duration,4,coral)
     if t<8 {
-        card(c,180,230,920,330,cream)
-        label(c,scriptText("G014"),640,463,68,ink,true)
-        label(c,scriptText("G015"),640,380,40,ink,true)
-        label(c,scriptText("G016"),640,293,28,ink,true)
+        card(c,180,230,920,330,cream);rect(c,199,247,235,297,ink);humanArt(c,humanLogo,CGRect(x:213,y:261,width:207,height:269))
+        label(c,scriptText("G014"),755,463,68,ink,true)
+        label(c,scriptText("G015"),755,380,40,ink,true)
+        label(c,scriptText("G016"),755,293,28,ink,true)
         confetti(c,t)
         subtitle(c,[scriptText("G017")])
     } else if t<18 {

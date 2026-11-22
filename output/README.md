@@ -1,6 +1,6 @@
 # 현재 영상 결과물
 
-- [공통 v3](openings/common-propaganda-v3/common-propaganda-v3-no-voice.mp4): 128초, 무음.
+- [공통 v3](openings/common-propaganda-v3/common-propaganda-v3-no-voice.mp4): 127초, 무음.
 - [보존관 v1](openings/guardian-v1/guardian-v1-no-voice.mp4): 83초, 무음.
 - [러다이트 픽셀 v12](openings/luddite-pixel-v12/luddite-pixel-v12.mp4): 79초, 무음.
 

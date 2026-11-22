@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 ROOT = Path(__file__).resolve().parents[2]
 DOCUMENT = ROOT / 'docs/영상-3편-콘티와-대사.md'
 FILMS = {
-    'common': ('C', 'render-common-propaganda-v3.swift', 'common-propaganda-v3', 'common-propaganda-v3-no-voice.mp4', 128),
+    'common': ('C', 'render-common-propaganda-v3.swift', 'common-propaganda-v3', 'common-propaganda-v3-no-voice.mp4', 127),
     'guardian': ('G', 'render-guardian-v1.swift', 'guardian-v1', 'guardian-v1-no-voice.mp4', 83),
     'luddite': ('L', 'render-luddite-pixel-v12.swift', 'luddite-pixel-v12', 'luddite-pixel-v12.mp4', 79),
 }

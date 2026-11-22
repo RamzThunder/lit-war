@@ -169,9 +169,17 @@ func staticNoise(_ c:CGContext,_ t:Double,_ strength:Double) {
     if strength>0.7 && f%47<2 {fill(c,0,Double(230+(f*7)%350),1280,5,cyan.withAlphaComponent(0.14))}
 }
 let sceneTimes:[(Double,String)]=[(0,"01-normal"),(4,"02-contact"),(10,"03-memory"),(21,"04-backup"),(33,"05-contaminate"),(45,"06-guardian"),(57,"07-read"),(65,"08-main-line"),(73,"09-end")]
+// Fit the original artwork by its visible bounds, with equal margins on both sides.
+func humanArt(_ c:CGContext,_ image:CGImage,_ box:CGRect) {
+    let scale=min(box.width/CGFloat(image.width),box.height/CGFloat(image.height))
+    let w=CGFloat(image.width)*scale,h=CGFloat(image.height)*scale
+    c.saveGState();c.interpolationQuality = .high
+    c.draw(image,in:CGRect(x:box.midX-w/2,y:box.midY-h/2,width:w,height:h));c.restoreGState()
+}
 func normalTerminal(_ c:CGContext,_ t:Double) {
     background(c,assignmentLibrary,t,0.19)
     frame(c,220,185,840,385,cyan)
+    humanArt(c,humanMark,CGRect(x:278,y:459,width:80,height:76))
     text(c,scriptText("L006"),640,490,44,white,true)
     text(c,scriptText("L007"),640,438,22,cyan,true)
     text(c,scriptText("L008"),640,343,33,white,true)
@@ -180,16 +188,12 @@ func normalTerminal(_ c:CGContext,_ t:Double) {
     text(c,String(format:"%02d%%",Int(p*100)),970,277,22,cyan)
     text(c,scriptText("L009"),640,225,22,cyan,true)
 }
-// Temporary faction mark: a broken enclosure and an angular L cut by a slash.
-func emblem(_ c:CGContext,_ x:Double,_ y:Double,_ scale:Double=1,_ color:NSColor=red) {
-    c.saveGState();c.translateBy(x:x,y:y);c.scaleBy(x:scale,y:scale)
-    c.setShouldAntialias(false);c.setStrokeColor(color.cgColor);c.setLineWidth(12)
-    c.setLineCap(.square);c.setLineJoin(.miter)
-    c.move(to:CGPoint(x:-45,y:112));c.addLine(to:CGPoint(x:-108,y:78));c.addLine(to:CGPoint(x:-108,y:-74));c.addLine(to:CGPoint(x:-44,y:-112));c.strokePath()
-    c.move(to:CGPoint(x:45,y:-112));c.addLine(to:CGPoint(x:108,y:-78));c.addLine(to:CGPoint(x:108,y:74));c.addLine(to:CGPoint(x:44,y:112));c.strokePath()
-    fill(c,-43,-56,23,123,color);fill(c,-43,-56,98,23,color)
-    c.setLineWidth(13);c.move(to:CGPoint(x:2,y:-89));c.addLine(to:CGPoint(x:64,y:94));c.strokePath()
-    c.restoreGState()
+let humanMark = readArt("identity/human-mark.png")
+let ludditeMark = readArt("identity/luddite-mark.png")
+func emblem(_ c:CGContext,_ x:Double,_ y:Double,_ scale:Double=1) {
+    let side = 224*scale
+    c.saveGState();c.interpolationQuality = .none
+    c.draw(ludditeMark,in:CGRect(x:x-side/2,y:y-side/2,width:side,height:side));c.restoreGState()
 }
 func takeoverNoise(_ c:CGContext,_ t:Double,_ strength:Double) {
     staticNoise(c,t,3*strength)
@@ -323,7 +327,7 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             takeoverNoise(c,u,s)
             if u>=6 {
                 let offset=u<6.8 ? Double(Int(u*24)%3-1)*15:0
-                emblem(c,640+offset,425,1,red)
+                emblem(c,640+offset,425,1)
                 text(c,scriptText("L017"),640-offset,234,66,red,true)
                 text(c,scriptText("L018"),640,177,22,red,true)
             }
@@ -335,7 +339,7 @@ func draw(_ c:CGContext,_ elapsed:Double) {
             c.restoreGState()
             fill(c,70,460,330,3,cyan.withAlphaComponent(0.2));fill(c,70,460,287,3,red.withAlphaComponent(0.45))
             text(c,scriptText("L019"),73,424,22,red.withAlphaComponent(0.7))
-            emblem(c,640,425,0.65,red)
+            emblem(c,640,425,0.65)
             text(c,scriptText("L020"),640,288,22,red,true)
             message(c,u<11.5 ? [scriptText("L021"),scriptText("L022")]:[scriptText("L023"),scriptText("L024")],scriptText("L025"),red)
             takeoverNoise(c,u,0.12)

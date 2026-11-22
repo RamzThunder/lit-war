@@ -26,7 +26,7 @@ func scriptText(_ id:String)->String {
     return value
 }
 // END SHARED STORYBOARD READER
-let requiredScriptIDs=["C001", "C002", "C003", "C004", "C005", "C006", "C007", "C008", "C009", "C010", "C011", "C012", "C013", "C014", "C015", "C016", "C017", "C018", "C019", "C020", "C021", "C022", "C023", "C024", "C025", "C026", "C027", "C028", "C029", "C030", "C031", "C032", "C033", "C034", "C035", "C036", "C037", "C038", "C039", "C040", "C041", "C042", "C043", "C044", "C045", "C046", "C047", "C048", "C049", "C050", "C051", "C052", "C053", "C054", "C055", "C056", "C057", "C058", "C059", "C060", "C061", "C062", "C063", "C064", "C065", "C066", "C067", "C068", "C069", "C070", "C071", "C072", "C073", "C074", "C075", "C076", "C077", "C078", "C079", "C080", "C081", "C082", "C083", "C084", "C085", "C086"]
+let requiredScriptIDs=["C001", "C002", "C003", "C004", "C005", "C006", "C007", "C008", "C009", "C010", "C011", "C012", "C013", "C014", "C015", "C016", "C017", "C018", "C019", "C020", "C021", "C022", "C023", "C024", "C025", "C026", "C027", "C028", "C029", "C030", "C031", "C032", "C033", "C034", "C035", "C036", "C037", "C038", "C039", "C040", "C041", "C042", "C043", "C044", "C045", "C046", "C047", "C048", "C049", "C050", "C051", "C052", "C053", "C054", "C055", "C056", "C057", "C058", "C059", "C060", "C061", "C062", "C063", "C064", "C065", "C066", "C067", "C068", "C069", "C070", "C071", "C072", "C073", "C074", "C075", "C076", "C077", "C078", "C079", "C080", "C081", "C082", "C084", "C085", "C086"]
 for id in requiredScriptIDs {_ = scriptText(id)}
 if CommandLine.arguments.contains("--dump-script") {
     let data=try JSONSerialization.data(withJSONObject:Dictionary(uniqueKeysWithValues:requiredScriptIDs.map{($0,scriptText($0))}),options:[.sortedKeys])
@@ -35,7 +35,7 @@ if CommandLine.arguments.contains("--dump-script") {
 let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let out=URL(fileURLWithPath:ProcessInfo.processInfo.environment["OPENING_OUTPUT_DIR"] ?? root.appendingPathComponent("output/openings/common-propaganda-v3").path)
 try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
-let W=1280,H=720,fps:Int32=24,duration=128.0
+let W=1280,H=720,fps:Int32=24,duration=127.0
 for name in ["Galmuri11.ttf","Galmuri11-Bold.ttf"] {
     CTFontManagerRegisterFontsForURL(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts/\(name)") as CFURL,.process,nil)
 }
@@ -44,6 +44,15 @@ func load(_ name:String)->CGImage {
     guard let s=CGImageSourceCreateWithURL(u as CFURL,nil),let im=CGImageSourceCreateImageAtIndex(s,0,nil) else {fatalError("Missing art: \(u.path)")};return im
 }
 let city=load("bright-city"),room=load("human-room")
+// Fit the original artwork by its visible bounds, with equal margins on both sides.
+func humanArt(_ c:CGContext,_ image:CGImage,_ box:CGRect) {
+    let scale=min(box.width/CGFloat(image.width),box.height/CGFloat(image.height))
+    let w=CGFloat(image.width)*scale,h=CGFloat(image.height)*scale
+    c.saveGState();c.interpolationQuality = .high
+    c.draw(image,in:CGRect(x:box.midX-w/2,y:box.midY-h/2,width:w,height:h));c.restoreGState()
+}
+let humanLogo=load("../identity/human-lockup").cropping(to:CGRect(x:187,y:97,width:1160,height:844))!
+let humanMark=load("../identity/human-mark")
 func color(_ hex:Int,_ a:Double=1)->NSColor {NSColor(calibratedRed:Double((hex>>16)&255)/255,green:Double((hex>>8)&255)/255,blue:Double(hex&255)/255,alpha:a)}
 let ink=color(0x173D4A),cream=color(0xFFF8DC),mint=color(0xA8E9CF),coral=color(0xF26C68),yellow=color(0xFFD66E),blue=color(0x9ECFEF),night=color(0x111D2B),paper=color(0xF4DFB1)
 func clamp(_ x:Double)->Double {min(1,max(0,x))}
@@ -103,7 +112,7 @@ func chip(_ c:CGContext,_ x:Double,_ y:Double,_ title:String,_ tint:NSColor=mint
     sprite(c,"chip",x-4.5*size,y-4.5*size,size,tint);label(c,title,x,y-4.5*size-34,28,ink,true)
 }
 func progress(_ c:CGContext,_ t:Double) {
-    rect(c,48,666,1184,4,ink.withAlphaComponent(0.15));rect(c,48,666,1184*clamp(t/64),4,coral)
+    rect(c,48,666,1184,4,ink.withAlphaComponent(0.15));rect(c,48,666,1184*clamp(t/63),4,coral)
     label(c,scriptText("C001"),50,687,18,ink);label(c,scriptText("C002"),1090,687,18,ink,true)
 }
 func ticker(_ c:CGContext,_ s:String,_ t:Double) {
@@ -133,15 +142,15 @@ func confetti(_ c:CGContext,_ t:Double) {
 }
 func ad(_ c:CGContext,_ t:Double) {
     picture(c,city,CGRect(x:0,y:0,width:1280,height:720));rect(c,0,0,1280,720,cream.withAlphaComponent(0.28));progress(c,t)
-    if t<5 {
+    if t<7.25 {
         let p=ease(t/0.7);c.saveGState();c.setAlpha(p)
         card(c,220,215,840,335,cream)
-        star(c,320,450,8,coral);star(c,890,282,5,mint)
-        label(c,scriptText("C003"),640,401,96,ink,true)
-        label(c,scriptText("C004"),640,316,42,ink,true)
-        label(c,scriptText("C005"),640,255,28,ink,true);c.restoreGState();confetti(c,t)
-    } else if t<18 {
-        let u=t-5;heading(c,scriptText("C006"),scriptText("C007"))
+        rect(c,236,230,238,306,ink);humanArt(c,humanLogo,CGRect(x:250,y:244,width:210,height:278))
+        label(c,scriptText("C003"),758,401,96,ink,true)
+        label(c,scriptText("C004"),758,316,42,ink,true)
+        label(c,scriptText("C005"),758,255,28,ink,true);c.restoreGState();confetti(c,t)
+    } else if t<17 {
+        let u=t-7.25;heading(c,scriptText("C006"),scriptText("C007"))
         for (i,name) in [scriptText("C008"),scriptText("C009"),scriptText("C010")].enumerated() {
             pop(c,70+Double(i)*400,250,age:u-Double(i)*0.65) {
                 card(c,0,0,350,245,[mint,blue,yellow][i]);rect(c,12,193,326,40,ink)
@@ -153,10 +162,10 @@ func ad(_ c:CGContext,_ t:Double) {
                 star(c,275,36,4,coral)
             }
         }
-        subtitle(c,u<6 ? [scriptText("C014")]:[scriptText("C015")])
+        subtitle(c,u<4.5 ? [scriptText("C014")]:[scriptText("C015")])
         ticker(c,scriptText("C016"),u)
-    } else if t<30 {
-        let u=t-18;heading(c,scriptText("C017"),scriptText("C018"))
+    } else if t<29 {
+        let u=t-17;heading(c,scriptText("C017"),scriptText("C018"))
         card(c,65,245,440,285,cream);label(c,scriptText("C019"),285,481,30,ink,true)
         for i in 0..<4 {label(c,"\(i+1).",95,431-Double(i)*45,26,ink);rect(c,145,435-Double(i)*45,220,7,ink.withAlphaComponent(0.25))
             if u>Double(i)*0.65+0.5 {label(c,scriptText("C020"),435,425-Double(i)*45,26,color(0x298E78),true)}}
@@ -166,27 +175,27 @@ func ad(_ c:CGContext,_ t:Double) {
         if u>3 {card(c,805,250,350,60,coral);label(c,scriptText("C022"),980,266,28,cream,true)}
         subtitle(c,u<6 ? [scriptText("C023")]:[scriptText("C024")])
         ticker(c,scriptText("C025"),u)
-    } else if t<41 {
-        let u=t-30;heading(c,scriptText("C026"),scriptText("C027"))
+    } else if t<40 {
+        let u=t-29;heading(c,scriptText("C026"),scriptText("C027"))
         for i in 0..<3 {
             let x=Double(210+i*430);pop(c,x-105,270,age:u-Double(i)*0.4){card(c,0,0,210,210,[blue,mint,yellow][i]);sprite(c,["paper","chip","case"][i],62,80,9,[blue,mint,yellow][i]);label(c,[scriptText("C028"),scriptText("C029"),scriptText("C030")][i],105,34,28,ink,true)}
         }
         if u>3 {rect(c,155,220,970,36,ink);label(c,scriptText("C031"),640,227,26,cream,true)}
-        subtitle(c,u<5.5 ? [scriptText("C032")]:[scriptText("C033")])
+        subtitle(c,u<5.1 ? [scriptText("C032")]:[scriptText("C033")])
         ticker(c,scriptText("C034"),u)
-    } else if t<52 {
-        let u=t-41;heading(c,scriptText("C035"),scriptText("C036"))
+    } else if t<51 {
+        let u=t-40;heading(c,scriptText("C035"),scriptText("C036"))
         let p=ease((u-1)/5)
         for i in 0..<6 {
             let a=Double(i)*Double.pi/3;let x=640+cos(a)*360*(1-p),y=378+sin(a)*130*(1-p)
             if p<0.98 {rect(c,min(x,640),y,abs(640-x)+4,4,ink);rect(c,638,min(y,378),4,abs(378-y)+4,ink);chip(c,x,y,scriptText("C037"),[mint,blue,yellow][i%3],7)}
             for k in 0..<5 {let q=(u*0.5+Double(k)/5).truncatingRemainder(dividingBy:1);rect(c,x+(640-x)*q,y+(378-y)*q,8,8,coral)}
         }
-        if p>0.6 {pop(c,300,270,age:(p-0.6)*3){card(c,0,0,680,220,ink);label(c,scriptText("C003"),340,100,82,cream,true);label(c,scriptText("C038"),340,40,30,mint,true)}}
+        if p>0.6 {pop(c,300,270,age:(p-0.6)*3){card(c,0,0,680,220,ink);humanArt(c,humanMark,CGRect(x:60,y:96,width:84,height:80));label(c,scriptText("C003"),340,100,82,cream,true);label(c,scriptText("C038"),340,40,30,mint,true)}}
         subtitle(c,u<5 ? [scriptText("C039")]:[scriptText("C040")])
         ticker(c,scriptText("C041"),u)
     } else {
-        let u=t-52;heading(c,scriptText("C042"),scriptText("C043"))
+        let u=t-51;heading(c,scriptText("C042"),scriptText("C043"))
         for i in 0..<6 {
             let p=ease((u-Double(i)*0.3)/3);let x=100+Double(i)*180
             sprite(c,"case",x,340+p*400,7,blue)
@@ -198,13 +207,32 @@ func ad(_ c:CGContext,_ t:Double) {
         ticker(c,scriptText("C047"),u)
     }
 }
+// Brief losses of horizontal sync on the local terminal glass.
+func terminalNoise(_ c:CGContext,_ elapsed:Double) {
+    let bursts = [(2.1,0.24),(10.7,0.34),(19.4,0.21),(27.8,0.38),(38.6,0.28),(46.2,0.32)]
+    guard let (start,length)=bursts.first(where:{elapsed >= $0.0 && elapsed < $0.0+$0.1}) else{return}
+    let phase=(elapsed-start)/length
+    let frame=Int(elapsed*24)
+    c.saveGState();c.clip(to:CGRect(x:128,y:192,width:1024,height:357))
+    let strength=sin(.pi*phase)
+    let y=199+phase*340
+    rect(c,128,y,1024,5,mint.withAlphaComponent(0.22*strength))
+    for i in 0..<65 {
+        let x=128+(i*163+frame*59)%1024
+        let row=Int(y)+(i*23+frame*7)%53-26
+        rect(c,Double(x),Double(row),Double(4+(i*19)%73),2,
+             (i%3==0 ? mint:paper).withAlphaComponent(0.36*strength))
+    }
+    c.restoreGState()
+}
 func human(_ c:CGContext,_ t:Double) {
     picture(c,room,CGRect(x:0,y:0,width:1280,height:720))
     rect(c,0,0,1280,720,night.withAlphaComponent(0.32))
     // An explicit archive terminal replaces the powered-off public display.
     card(c,120,185,1040,420,night)
     rect(c,125,553,1030,46,color(0x273844));label(c,scriptText("C048"),147,567,24,paper)
-    let u=t-71
+    let u=t-70
+    terminalNoise(c,u)
     let messages:[(Double,Double,[String])] = [
         (0,5,[scriptText("C049"),scriptText("C050")]),
         (5,12,[scriptText("C051"),scriptText("C052")]),
@@ -278,10 +306,10 @@ func human(_ c:CGContext,_ t:Double) {
 }
 func draw(_ c:CGContext,_ t:Double) {
     rect(c,0,0,1280,720,night)
-    if t<64 {ad(c,t)}
-    else if t<68 {
+    if t<63 {ad(c,t)}
+    else if t<67 {
         // Pull back from the ad: it was playing on a physical screen all along.
-        let p=ease((t-64)/2.2)
+        let p=ease((t-63)/2.2)
         let box=CGRect(x:278,y:210,width:726,height:379)
         // Move the camera from the display bounds to the whole room. Both the
         // room and the broadcast share this transform, keeping the screen fixed.
@@ -292,19 +320,19 @@ func draw(_ c:CGContext,_ t:Double) {
         c.scaleBy(x:1280/viewport.width,y:720/viewport.height)
         c.translateBy(x:-viewport.minX,y:-viewport.minY)
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720))
-        c.saveGState();c.clip(to:box);c.translateBy(x:box.minX,y:box.minY);c.scaleBy(x:box.width/1280,y:box.height/720);ad(c,63);c.restoreGState()
-        if t>65.5 {
-            let q=ease((t-65.5)/1.4);let x=1140-185*q,y=70+85*q
+        c.saveGState();c.clip(to:box);c.translateBy(x:box.minX,y:box.minY);c.scaleBy(x:box.width/1280,y:box.height/720);ad(c,62);c.restoreGState()
+        if t>64.5 {
+            let q=ease((t-64.5)/1.4);let x=1140-185*q,y=70+85*q
             sprite(c,"cursor",x,y,4,cream)
-            if t>67.2 {rect(c,943,190,24,8,coral);label(c,scriptText("C083"),1010,185,20,paper)}
+            if t>66.2 {rect(c,943,190,24,8,coral)}
         }
         c.restoreGState()
-    } else if t<71 {
+    } else if t<70 {
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720))
         rect(c,278,210,726,379,.black)
-        if t<68.45 {let p=clamp((t-68)/0.45);rect(c,278,399.5-189.5*(1-p),726,379*(1-p),cream)}
-        if t>69 {label(c,scriptText("C084"),640,80,34,paper,true)}
-    } else if t<121 {human(c,t)}
+        if t<67.45 {let p=clamp((t-67)/0.45);rect(c,278,399.5-189.5*(1-p),726,379*(1-p),cream)}
+        if t>68 {label(c,scriptText("C084"),640,80,34,paper,true)}
+    } else if t<120 {human(c,t)}
     else {
         picture(c,room,CGRect(x:0,y:0,width:1280,height:720));rect(c,0,0,1280,720,night.withAlphaComponent(0.91))
         label(c,scriptText("C026"),640,510,64,mint,true)
@@ -312,7 +340,7 @@ func draw(_ c:CGContext,_ t:Double) {
         label(c,scriptText("C086"),640,283,34,paper,true)
         for i in 0..<8 {label(c,"\(1910+i*10)",190+Double(i)*128,160,24,i%2==0 ? mint:coral,true)}
     }
-    if t>=68 {for i in stride(from:0,to:720,by:4) {rect(c,0,Double(i),1280,1,night.withAlphaComponent(0.08))}}
+    if t>=67 {for i in stride(from:0,to:720,by:4) {rect(c,0,Double(i),1280,1,night.withAlphaComponent(0.08))}}
     let fade=min(1,t/0.3)*min(1,max(0,(duration-t)/0.4))
     if fade<1 {rect(c,0,0,1280,720,night.withAlphaComponent(1-fade))}
 }

@@ -3,7 +3,7 @@
 # 사용법: sh scripts/openings/make-teaser.sh [출력 폴더]
 #   기본 출력: output/openings/common-propaganda-v3/teaser/
 #   - war-teaser.mp4   카드에서 소리 없이 반복 재생하는 약 40초 하이라이트 (H.264, 720p)
-#   - war-full.mp4     '전체 보기' 창에서 재생하는 128초 전체 (Cloudflare Pages 파일 한도 25MB 아래)
+#   - war-full.mp4     '전체 보기' 창에서 재생하는 127초 전체 (Cloudflare Pages 파일 한도 25MB 아래)
 #   - war-teaser.webp  영상이 뜨기 전 보이는 포스터 (마지막 제목 화면)
 # 필요: ffmpeg (brew install ffmpeg), python3 + Pillow (포스터 WebP)
 set -eu
@@ -16,12 +16,12 @@ mkdir -p "$OUT"
 #  1 HUMAN 축하 / 2 2024 채팅창 / 3 AGI가 하나로(HUMAN) / 4 노동에서 해방
 #  5 광고 전원 끄기 / 6 보존관 복구·러다이트 원본 보관과 변조 / 7 제목
 SEGS="0.5 3.5
-12 16
-43 49
-55 59.5
-64.5 71
-106 116.5
-121 128"
+11.75 15.75
+42 48
+54 58.5
+63.5 70
+105 115.5
+120 127"
 XF=0.3   # 구간 사이 겹쳐 사라지는 시간(초)
 
 filter="" ; i=0
@@ -52,7 +52,7 @@ ffmpeg -v error -y -i "$SRC" -an \
   -c:v libx264 -preset slow -crf 22 -profile:v high -pix_fmt yuv420p -movflags +faststart \
   "$OUT/war-full.mp4"
 
-ffmpeg -v error -y -ss 127.5 -i "$SRC" -frames:v 1 "$OUT/.poster.png"
+ffmpeg -v error -y -ss 126.5 -i "$SRC" -frames:v 1 "$OUT/.poster.png"
 python3 -c "import sys;from PIL import Image;Image.open(sys.argv[1]).save(sys.argv[2],quality=85,method=6)" "$OUT/.poster.png" "$OUT/war-teaser.webp"
 rm -f "$OUT/.poster.png"
 
