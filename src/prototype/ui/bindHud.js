@@ -99,18 +99,18 @@ export function bindHud(state) {
     $('#alert-seconds').textContent = eventLeft;
     $('#alert-detail').textContent = state.me?.team === 'red' ? '미션을 깨면 미끼를 심을 수 있어요 · 점수 2배' : '오염된 단말기를 찾아 정화하세요 · 점수 2배';
   };
-  return function tick({ raid, stunned }) {
+  return function tick({ raid, stunned, recovering, protectedNow }) {
     renderLesson();
     const banner = $('#raid-banner');
     $('#room-owner').textContent = raid?.role === 'attacker' ? `${raid.opponent.name}의 기록실 (침입 중)` : '내 기록실';
     if (!raid) { if (!banner.hidden) { banner.hidden = true; bannerKey = ''; renderSession(); lessonKey = ''; } return; }
     const seconds = Math.max(0, Math.ceil((raid.endsAt - performance.now()) / 1000));
-    const key = `${raid.role}:${seconds}:${raid.shocks}:${stunned}`;
+    const key = `${raid.role}:${seconds}:${raid.shocks}:${stunned}:${recovering}:${protectedNow}`;
     if (key === bannerKey) return;
     if (banner.hidden) renderSession();
     bannerKey = key; banner.hidden = false; $('#alert-slot').hidden = true;
     banner.className = `s-chip s-event ${raid.role}`;
-    $('#raid-title').textContent = raid.role === 'attacker' ? `⚡ ${raid.opponent.name} 감전시키기` : stunned ? '⚡ 감전!' : `🏃 ${raid.opponent.name}에게서 도망가기`;
+    $('#raid-title').textContent = recovering ? '방전 후 충전 중 · 잠시 멈춤' : !stunned && protectedNow ? (raid.role === 'defender' ? '보호 중! 지금 거리를 벌리세요' : '상대 보호 중 · 추격하세요') : raid.role === 'attacker' ? `⚡ ${raid.opponent.name} 감전시키기` : stunned ? '⚡ 감전!' : `🏃 ${raid.opponent.name}에게서 도망가기`;
     $('#raid-detail').textContent = `감전 ${raid.shocks} / ${raid.maxShocks}`;
     $('#raid-seconds').textContent = seconds;
   };

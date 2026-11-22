@@ -7,18 +7,23 @@ import { bindSession } from './ui/bindSession.js';
 import { DataCenter } from './scenes/DataCenter.js';
 import { bindUI } from './ui/bindUI.js';
 import { bindTouch } from './ui/bindTouch.js';
+import { bindTutorial } from './ui/bindTutorial.js';
 import { bindOpening } from './ui/bindOpening.js';
 import { bindShortcuts } from './ui/bindShortcuts.js';
 import { bindFocus } from './ui/bindFocus.js';
+const training = new URLSearchParams(location.search).has('training');
 const state = new SessionState();
-bindSession(state);
+if (training) {
+  const { startTraining } = await import('../tutorial-preview.js');
+  startTraining(state);
+} else bindSession(state);
 // Dev-only handle for automated browser checks; not included in production builds.
 if (import.meta.env.DEV) window.__litwar = state;
 const updateContext = bindUI(state);
 const touch = bindTouch();
-bindOpening(state);
+if (!training) bindOpening(state, bindTutorial(state));
 bindShortcuts(state);
-bindFocus(state);
+if (!training) bindFocus(state);
 new Phaser.Game({
   type: Phaser.AUTO, parent: 'game', backgroundColor: '#101b25',
   pixelArt: true, roundPixels: true, antialias: false,

@@ -6,7 +6,7 @@ export const MAX_PLAYERS = 30;
 export const TEAMS = ['blue', 'red'];
 export const RULES = Object.freeze({
   sabotageEvery: 5, raidEvery: 10,
-  raidMs: 15000, shockRange: 40, shockCooldown: 1000, stunMs: 1500, invulnMs: 1000, maxShocks: 5, steal: 5,
+  raidMs: 15000, shockRange: 40, shockCooldown: 1000, stunMs: 500, recoveryMs: 1400, invulnMs: 2000, maxShocks: 5, steal: 5,
   barricadeMs: 120000, maxBarricades: 3, maxBroken: 1,
   trapSteal: 10,
   // Contamination alert: a 1-minute event. Luddites may plant one bait per mission,
@@ -24,7 +24,7 @@ const recordOf = (era, id) => wiringRecords[era].find(r => r.id === id);
 export const PHASES = ['free', 'lobby', 'opening', 'playing', 'paused', 'ended'];
 const ACTIVE = new Set(['free', 'playing']);
 const newLesson = () => ({ phase: 'free', endsAt: null, remainMs: null, durationMs: null, keyHash: null, event: null, eventFired: false, opening: null });
-const PHASE_BLOCKED = { lobby: '선생님이 게임을 시작하면 할 수 있어요.', opening: '오프닝 영상이 끝나면 선생님이 게임을 시작해요.', paused: '선생님이 게임을 잠시 멈췄어요.', ended: '게임이 끝났어요.' };
+const PHASE_BLOCKED = { lobby: '선생님이 게임을 시작하면 할 수 있어요.', opening: '영상과 튜토리얼이 끝나면 선생님이 게임을 시작해요.', paused: '선생님이 게임을 잠시 멈췄어요.', ended: '게임이 끝났어요.' };
 // Room authority. Students roam their own copy of the map without sending positions; the
 // server judges missions, awards team points and attack rights, and relays movement only
 // between the two players of a live raid. command() returns messages as { to, data } where
@@ -174,7 +174,7 @@ export class RoomEngine {
         if (phase === 'playing' || phase === 'paused') return error('이미 진행 중이에요.');
         if (phase === 'opening' && !this.openingProgress().ready && !message.force) {
           const { done, total } = this.openingProgress();
-          return error(`아직 오프닝 영상을 보는 학생이 있어요. (${done}/${total}명 완료)`);
+          return error(`아직 영상이나 튜토리얼을 진행 중인 학생이 있어요. (${done}/${total}명 완료)`);
         }
         const minutes = Math.round(Number(message.minutes));
         if (!Number.isFinite(minutes) || minutes < 1 || minutes > 90) return error('시간은 1~90분 사이로 정하세요.');
@@ -347,7 +347,7 @@ export class RoomEngine {
     return [this.#lessonMessage(now), ...this.teacherUpdate(), ...(progress.ready ? this.#feed(`🎬 모든 학생이 오프닝을 봤어요 (${progress.total}명)`, 'lesson', now) : [])];
   }
   #openingReport(s, { status, pct }) {
-    if (this.lesson.phase !== 'opening' || !['loading', 'click', 'playing', 'error'].includes(status)) return [];
+    if (this.lesson.phase !== 'opening' || !['loading', 'click', 'playing', 'tutorial', 'error'].includes(status)) return [];
     s.opening = status === 'loading' ? { status, pct: Math.max(0, Math.min(100, Math.round(Number(pct) || 0))) } : { status };
     return this.teacherUpdate();
   }
@@ -491,7 +491,8 @@ export class RoomEngine {
     const correction = () => (s.player ? [{ to: s.id, data: { type: 'correction', player: { ...s.player } } }] : []);
     const { x, y, direction, moving } = message;
     if (!['up', 'down', 'left', 'right'].includes(direction) || typeof moving !== 'boolean') return correction();
-    if (s.id === raid.defender && now < raid.stunUntil && s.player && (x !== s.player.x || y !== s.player.y)) return correction();
+    const lockedUntil = s.id === raid.defender ? raid.stunUntil : raid.recoveryUntil;
+    if (now < lockedUntil && s.player && (x !== s.player.x || y !== s.player.y)) return correction();
     const extra = this.#raidSolids(raid, now);
     if (!validPosition(x, y, extra)) return correction();
     if (s.player) {
@@ -517,6 +518,7 @@ export class RoomEngine {
     if (!s.player || !defender?.player || now < raid.invulnUntil) return miss('지금은 감전되지 않아요.');
     if (Math.hypot(s.player.x - defender.player.x, s.player.y - defender.player.y) > RULES.shockRange) return miss('더 가까이 가야 해요!');
     raid.shocks++; raid.cooldownUntil = now + RULES.shockCooldown; this.raidsDirty = true;
+    raid.recoveryUntil = now + RULES.recoveryMs;
     raid.stunUntil = now + RULES.stunMs; raid.invulnUntil = raid.stunUntil + RULES.invulnMs;
     defender.player.moving = false;
     // Steal from the era where the defending team is strongest.
@@ -524,7 +526,7 @@ export class RoomEngine {
     const era = ERAS.reduce((best, e) => (this.scores[e][def] > this.scores[best][def] ? e : best), ERAS[0]);
     const stolen = Math.min(RULES.steal, this.scores[era][def]);
     this.scores[era][def] -= stolen; this.scores[era][att] += stolen; raid.stolen += stolen; this.scoresDirty = true;
-    const data = { type: 'shock', shocks: raid.shocks, maxShocks: RULES.maxShocks, stunMs: RULES.stunMs, stolen, era, defender: { id: defender.id, ...defender.player } };
+    const data = { type: 'shock', shocks: raid.shocks, maxShocks: RULES.maxShocks, stunMs: RULES.stunMs, recoveryMs: RULES.recoveryMs, invulnMs: RULES.invulnMs, stolen, era, defender: { id: defender.id, ...defender.player } };
     return [{ to: s.id, data }, { to: defender.id, data }, ...this.#toTeachers({ type: 'watch-shock', id: raid.id, shocks: raid.shocks, stolen, totalStolen: raid.stolen, era, stunMs: RULES.stunMs, defender: defender.player }), { to: '*', data: { type: 'scores', scores: this.scores } }, ...this.#feed(`⚡ ${s.name}이(가) ${defender.name} 감전${stolen ? ` · ${era}년대 ${stolen}점 탈취` : ''}`, att, now)];
   }
   #endRaid(raidId, now, reason) {

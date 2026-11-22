@@ -27,6 +27,29 @@ export class DataCenter extends Phaser.Scene {
     this.physics.world.setBounds(24, 64, map.width - 48, map.height - 88);
     this.physics.add.collider(this.player, this.solids);
     this.physics.add.collider(this.player, this.blockers);
+    const keycap = this.add.graphics();
+    keycap.fillStyle(0x152638, .95).fillRoundedRect(-8, -6, 16, 13, 3);
+    keycap.lineStyle(.8, 0x9fcff1).strokeRoundedRect(-8, -6, 16, 12, 3);
+    const glyph = this.add.text(0, 0, 'E', {
+      fontFamily: 'Arial, sans-serif', fontSize: '9px', fontStyle: 'bold', resolution: 3, color: '#ecf6ff',
+    }).setOrigin(.5);
+    this.objectHint = this.add.container(0, 0, [keycap, glyph]).setDepth(1000).setVisible(false);
+    if (this.state.training) {
+      // Dilate the console artwork's alpha mask, then cut out its original silhouette.
+      const texture = this.textures.createCanvas('console-outline', 132, 76);
+      const ctx = texture.context;
+      const consoleImage = this.textures.get('restoration-console').getSourceImage();
+      for (const [dx, dy] of [[0,-2],[2,0],[0,2],[-2,0],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        ctx.drawImage(consoleImage, 2 + dx, 2 + dy, 128, 72);
+      }
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.fillStyle = '#55adff'; ctx.fillRect(0, 0, 132, 76);
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(consoleImage, 2, 2, 128, 72);
+      texture.refresh();
+      this.consoleOutline = this.add.image(0, 0, 'console-outline').setDisplaySize(66, 38).setDepth(5).setVisible(false);
+      this.doorOutline = this.add.rectangle(0, 0, 22, 60).setStrokeStyle(1, 0x55adff).setDepth(5).setVisible(false);
+    }
     this.opponent = null;
     this.nameLabel = this.add.text(this.player.x, this.player.y - 38, '나', { fontSize: '9px', fontFamily: 'sans-serif', color: '#d7fff0', backgroundColor: '#10232c' }).setOrigin(.5).setDepth(20);
     this.lastSentAt = 0; this.lastSent = '';
@@ -74,7 +97,9 @@ export class DataCenter extends Phaser.Scene {
     const resize = () => {
       const camera = this.cameras.main;
       camera.setZoom(this.scale.width >= 700 && this.scale.height >= 420 ? 2 : 1);
-      camera.setBounds(0, 0, map.width, map.height);
+      const width = Math.max(camera.displayWidth, map.width);
+      const height = Math.max(camera.displayHeight, map.height);
+      camera.setBounds((map.width - width) / 2, (map.height - height) / 2, width, height);
     };
     resize(); this.scale.on('resize', resize);
     this.cameras.main.startFollow(this.player, true, 1, 1);
@@ -92,6 +117,11 @@ export class DataCenter extends Phaser.Scene {
   }
   // What the E key would do here: open a terminal, or repair a sabotage.
   target() {
+    const target = this.nearbyInteraction();
+    if (target && this.state.training && !this.state.training.canInteract(target)) return null;
+    return target;
+  }
+  nearbyInteraction() {
     if (this.state.raid) return null;
     const sabotages = this.state.roomSabotages();
     const barricade = sabotages.find(s => s.kind === 'barricade' && isNearDoor(this.player, doorFor(s.era)));
@@ -133,7 +163,9 @@ export class DataCenter extends Phaser.Scene {
     const open = this.state.snapshot.terminalOpen;
     const modal = Boolean(document.querySelector('dialog[open]'));
     const stunned = raid?.role === 'defender' && performance.now() < raid.stunnedUntil;
-    const blocked = open || modal || this.state.inputBlocked || stunned;
+    const recovering = raid?.role === 'attacker' && performance.now() < raid.recoveryUntil;
+    const protectedNow = performance.now() < raid?.protectedUntil;
+    const blocked = open || modal || this.state.inputBlocked || stunned || recovering;
     if (modal) this.input.keyboard.disableGlobalCapture();
     else if (!open) this.input.keyboard.enableGlobalCapture();
     if (this.state.correction) {
@@ -175,8 +207,24 @@ export class DataCenter extends Phaser.Scene {
       label.setPosition(sprite.x, sprite.y - 38);
     }
     const target = this.target();
-    const inRange = raid?.role === 'attacker' && peer?.x != null && Math.hypot(this.player.x - peer.x, this.player.y - peer.y) <= SHOCK_RANGE;
-    const context = { open, target, raid, inRange, stunned };
+    const inRange = raid?.role === 'attacker' && !protectedNow && peer?.x != null && Math.hypot(this.player.x - peer.x, this.player.y - peer.y) <= SHOCK_RANGE;
+    const training = this.state.training;
+    training?.onPosition(this.player);
+    if (training) {
+      const goal = training.goal;
+      const consoleGoal = Boolean(goal?.era);
+      this.consoleOutline.setVisible(Boolean(goal) && consoleGoal && !open);
+      this.doorOutline.setVisible(Boolean(goal) && !consoleGoal && !open);
+      if (goal) (consoleGoal ? this.consoleOutline : this.doorOutline)
+        .setPosition(goal.x, goal.y).setAlpha(.82 + .18 * Math.sin(time / 300));
+    }
+    this.objectHint.setVisible(Boolean(target) && !blocked);
+    if (target && !blocked) {
+      const door = target.kind === 'barricade' && doorFor(target.era);
+      const anchor = door || terminalFor(target.era);
+      this.objectHint.setPosition(anchor.x + (door ? door.width / 2 : 0), anchor.y - (door ? 17 : 28));
+    }
+    const context = { open, target, raid, inRange, stunned, recovering, protectedNow };
     this.updateContext(context); this.touch?.update(context);
   }
 }

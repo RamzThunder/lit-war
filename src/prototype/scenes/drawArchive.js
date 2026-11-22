@@ -1,3 +1,4 @@
+import { createTerminalWear } from './terminalWear.js';
 import { map, solids, doorFor, terminalFor } from '../map.js';
 import { archiveDepth } from './archiveDepth.js';
 import serverCabinet from '../assets/server-cabinet.webp';
@@ -20,6 +21,7 @@ export function preloadArchive(scene) {
 }
 
 export function drawArchive(scene, solid = () => {}) {
+  createTerminalWear(scene);
   const prop = (box, key) => scene.add.image(box.x, box.y, key).setOrigin(0).setDisplaySize(box.width, box.height);
   const mid = map.spawn.x;
   scene.add.image(0, 0, 'server-floor').setOrigin(0).setDisplaySize(map.width, map.height).setDepth(-2);
@@ -90,7 +92,7 @@ export function drawArchive(scene, solid = () => {}) {
       .moveTo(inlet - 3, t.y - 21).lineTo(inlet, t.y - 20).lineTo(inlet + 1, t.y - 16).strokePath();
     contactShadow(t.x, t.y + t.height / 2 - 1, t.width);
     scene.add.image(t.x, t.y, 'restoration-console').setDisplaySize(t.width, t.height);
-    const scan = scene.add.rectangle(t.x, t.y - 14, 38, 1, 0x8dcebd, .65);
+    const scan = scene.add.rectangle(t.x, t.y - 14, 38, 1, 0x8dcebd, .65).setName(`console-scan-${t.era}`);
     scene.tweens.add({ targets: scan, y: t.y - 1, duration: 1300, delay: i * 220, repeatDelay: 2900, repeat: -1 });
   }
   const panelY = map.spawn.y - 24;
@@ -119,6 +121,20 @@ export function drawArchive(scene, solid = () => {}) {
 export function drawSabotages(scene, graphics, list, onBarricade = () => {}) {
   const labels = [];
   const r = (x, y, w, h, c, a = 1) => graphics.fillStyle(c, a).fillRect(x, y, w, h);
+  for (const t of map.terminals) {
+    // A broken terminal must be repaired before the contaminated record can be cleansed.
+    const broken = list.some(s => s.era === t.era && s.kind === 'broken');
+    const contam = list.some(s => s.era === t.era && s.kind === 'contam');
+    scene.children.getByName(`console-scan-${t.era}`)?.setVisible(!broken && !contam);
+    if (!broken && !contam) continue;
+    labels.push(scene.add.image(t.x, t.y, broken ? 'console-broken' : 'console-contam')
+      .setDisplaySize(t.width, t.height).setDepth(5));
+    labels.push(scene.add.text(t.x, t.y + 23, broken ? '고장' : '기록 오염', {
+      fontFamily: 'sans-serif', fontSize: '8px', resolution: 3,
+      color: broken ? '#ffd49a' : '#e3c1ff', backgroundColor: '#121924',
+      padding: { x: 3, y: 1 },
+    }).setOrigin(.5, 0).setDepth(6));
+  }
   for (const s of list) {
     if (s.kind === 'barricade') {
       const d = doorFor(s.era);
@@ -126,19 +142,10 @@ export function drawSabotages(scene, graphics, list, onBarricade = () => {}) {
       for (let y = d.y; y < d.y + d.height; y += 12) { r(d.x - 2, y, d.width + 4, 6, 0xd7a344); r(d.x - 2, y + 6, d.width + 4, 6, 0x1b2328); }
       onBarricade(d);
       labels.push(scene.add.text(d.x + d.width / 2, d.y - 10, '🚧', { fontSize: '12px' }).setOrigin(.5).setDepth(6));
-    } else if (s.kind === 'contam') {
-      const t = terminalFor(s.era);
-      r(t.x - 24, t.y - 17, 48, 19, 0x39294f);
-      for (let x = -22; x < 22; x += 8) r(t.x + x, t.y - 15 + ((x / 8) % 2 ? 6 : 0), 5, 4, 0xbb98eb);
-      labels.push(scene.add.text(t.x, t.y - 34, '🧪 오염', { fontSize: '10px', fontFamily: 'sans-serif', color: '#e5ccff', backgroundColor: '#211a31' }).setOrigin(.5).setDepth(6));
     } else if (s.kind === 'trap') {
       const t = terminalFor(s.era);
       labels.push(scene.add.text(t.x + 30, t.y + 6, '🪤', { fontSize: '13px' }).setOrigin(.5).setDepth(6));
-    } else {
-      const t = terminalFor(s.era);
-      r(t.x - 24, t.y - 17, 48, 19, 0x49232b);
-      r(t.x - 20, t.y - 15, 4, 15, 0xee7977); r(t.x - 6, t.y - 15, 3, 12, 0xee7977); r(t.x + 10, t.y - 13, 4, 11, 0xee7977);
-      labels.push(scene.add.text(t.x, t.y - 34, '💥 고장', { fontSize: '10px', fontFamily: 'sans-serif', color: '#ffb3a8', backgroundColor: '#24191e' }).setOrigin(.5).setDepth(6));
+
     }
   }
   return labels;

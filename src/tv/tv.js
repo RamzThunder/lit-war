@@ -53,10 +53,10 @@ function renderJoin() {
 // ---- lobby / opening ---------------------------------------------------------------------
 function renderLobby() {
   const opening = view.lesson?.phase === 'opening' ? view.lesson.opening : null;
-  $('#lobby-title').textContent = opening ? (opening.ready ? '모두 오프닝을 봤어요' : '오프닝 영상 시청 중') : '기록원 접속을 기다리는 중';
+  $('#lobby-title').textContent = opening ? (opening.ready ? '모두 게임 준비를 마쳤어요' : '영상 시청 · 튜토리얼 진행 중') : '기록원 접속을 기다리는 중';
   $('#lobby-state').textContent = opening ? '오프닝 상영' : '대기 중';
   $('#lobby-sector').textContent = opening ? '오프닝 상영' : '기록원 소집';
-  $('#lobby-foot').textContent = opening ? `시청 완료 ${opening.done} / ${opening.total}명 · 다 보면 선생님이 게임을 시작해요` : '모두 들어오면 선생님이 오프닝을 시작해요. 영상은 각자 기기에서 나와요.';
+  $('#lobby-foot').textContent = opening ? `준비 완료 ${opening.done} / ${opening.total}명 · 튜토리얼까지 마치면 선생님이 게임을 시작해요` : '모두 들어오면 선생님이 오프닝을 시작해요. 영상은 각자 기기에서 나와요.';
   const names = new Set();
   for (const team of ['blue', 'red']) {
     const list = view.roster.filter(p => p.team === team).sort((a, b) => a.name.localeCompare(b.name, 'ko'));

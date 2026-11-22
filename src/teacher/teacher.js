@@ -53,7 +53,7 @@ function renderLesson() {
   const chip = $('#opening-chip');
   chip.hidden = !opening;
   if (opening) {
-    chip.textContent = opening.ready ? `🎬 모두 시청 완료 (${opening.total}명) · 시작할 수 있어요` : `🎬 ${openingBreakdown()} · ${opening.done} / ${opening.total}명 완료`;
+    chip.textContent = opening.ready ? `🎬 모두 준비 완료 (${opening.total}명) · 시작할 수 있어요` : `🎬 ${openingBreakdown()} · ${opening.done} / ${opening.total}명 완료`;
     chip.className = `chip${opening.ready ? ' ready' : ''}`;
   }
   renderTimer();
@@ -63,12 +63,12 @@ setInterval(() => { renderTimer(); renderRaidTimer(); }, 250);
 setInterval(() => { if (awayList(view).length) renderRoster(); }, 1000);
 
 // Per-student opening status reported by each student's browser.
-const OPENING_TAG = { waiting: '⏳ 대기', click: '👆 재생 버튼 대기', playing: '▶ 시청 중', done: '✓ 시청 완료', error: '⚠ 재생 오류' };
+const OPENING_TAG = { waiting: '⏳ 대기', click: '👆 재생 버튼 대기', playing: '▶ 시청 중', tutorial: '🎮 튜토리얼 중', done: '✓ 준비 완료', error: '⚠ 재생 오류' };
 const openingTag = o => (!o ? '' : o.status === 'loading' ? `⬇ ${o.pct}%` : OPENING_TAG[o.status] ?? '');
 function openingBreakdown() {
   const online = view.roster.filter(p => p.online && p.opening);
   const count = test => online.filter(p => test(p.opening.status)).length;
-  const parts = [[count(s => s === 'loading' || s === 'waiting'), '불러오는 중'], [count(s => s === 'playing'), '시청 중'], [count(s => s === 'click' || s === 'error'), '확인 필요']];
+  const parts = [[count(s => s === 'loading' || s === 'waiting'), '불러오는 중'], [count(s => s === 'playing'), '시청 중'], [count(s => s === 'tutorial'), '튜토리얼 중'], [count(s => s === 'click' || s === 'error'), '확인 필요']];
   return parts.filter(([n]) => n).map(([n, label]) => `${label} ${n}`).join(' · ') || '준비 중';
 }
 
@@ -260,7 +260,7 @@ $('#opening').addEventListener('click', () => {
   if (!room.send({ type: 'opening' })) { flash('서버와 연결이 끊겨 있어요. 잠시 후 다시 눌러 주세요.'); return; }
   $('#opening').disabled = true; $('#opening').textContent = '⏳ 보내는 중…';
 });
-$('#force-start').addEventListener('click', () => { if (confirm('아직 영상을 보는 학생이 있어요. 기다리지 않고 바로 시작할까요?')) room.send({ type: 'start', minutes: minutes(), force: true }); });
+$('#force-start').addEventListener('click', () => { if (confirm('아직 영상이나 튜토리얼을 진행 중인 학생이 있어요. 기다리지 않고 바로 시작할까요?')) room.send({ type: 'start', minutes: minutes(), force: true }); });
 $('#pause').addEventListener('click', () => room.send({ type: 'pause' }));
 $('#resume').addEventListener('click', () => room.send({ type: 'resume' }));
 $('#end').addEventListener('click', () => { if (confirm('게임을 끝낼까요? 남은 시간이 사라집니다.')) room.send({ type: 'end' }); });

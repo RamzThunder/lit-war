@@ -150,6 +150,9 @@ test('live raid: positions relayed only between the pair, shock range/cooldown/s
   assert.equal(data(shock, 'shock', defenderId).shocks, 1);
   assert.equal(data(shock, 'shock', defenderId).stolen, 5);
   assert.ok(data(room.command(defenderId, { type: 'move', x: map.entry.x, y: map.entry.y - 64, direction: 'up', moving: true }, 1500), 'correction'), 'stunned');
+  const move = { type: 'move', x: map.entry.x, y: map.entry.y - 60, direction: 'up', moving: true };
+  assert.ok(data(room.command(defenderId, move, 2000), 'peer', 'a'), 'defender can escape');
+  assert.ok(data(room.command('a', move, 2000), 'correction'), 'attacker cannot follow during recovery');
   assert.equal(data(room.command('a', { type: 'shock' }, 2500), 'shock-miss').reason.includes('감전되지'), true, 'invulnerable right after stun');
   assert.equal(data(room.command('a', { type: 'shock' }, 4000), 'shock', 'a').shocks, 2);
   const blue = room.scores['1950'][a.profile.team]; assert.equal(blue, 10);
@@ -198,7 +201,7 @@ test('opening video: no timer, students report finishing, start waits for everyo
   assert.deepEqual(progress(opening.opening), { done: 0, total: 2, ready: false });
   assert.equal(opening.left, null, 'timer does not run');
   assert.equal(room.nextDeadline(), Infinity);
-  assert.equal(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }, 20), 'error').message, '오프닝 영상이 끝나면 선생님이 게임을 시작해요.');
+  assert.equal(data(room.command('a', { type: 'open', era: '1920', ...near('1920') }, 20), 'error').message, '영상과 튜토리얼이 끝나면 선생님이 게임을 시작해요.');
   assert.deepEqual(progress(data(room.command('a', { type: 'opening-done' }, 30), 'lesson', '*').lesson.opening), { done: 1, total: 2, ready: false });
   assert.deepEqual(room.command('a', { type: 'opening-done' }, 31), [], 'reported once');
   assert.match(data(room.command('t', { type: 'start', minutes: 30 }, 40), 'error').message, /1\/2명 완료/);
@@ -221,6 +224,9 @@ test('opening status: students report loading/playing and the teacher roster sho
   assert.deepEqual(data(room.command('a', { type: 'opening-status', status: 'loading', pct: 250 }, 3), 'roster', 't').roster[0].opening, { status: 'loading', pct: 100 });
   assert.deepEqual(room.command('a', { type: 'opening-status', status: 'hacked' }, 4), [], 'unknown status ignored');
   assert.deepEqual(data(room.command('a', { type: 'opening-status', status: 'playing' }, 5), 'roster', 't').roster[0].opening, { status: 'playing' });
+  assert.deepEqual(data(room.command('a', { type: 'opening-status', status: 'tutorial' }, 5), 'roster', 't').roster[0].opening, { status: 'tutorial' });
+  assert.equal(room.lessonView(5).opening.ready, false, 'tutorial is not ready until completion');
+  assert.ok(data(room.command('t', { type: 'start', minutes: 30 }, 5), 'error'), 'start waits for tutorial completion');
   assert.deepEqual(data(room.command('a', { type: 'opening-done' }, 6), 'roster', 't').roster[0].opening, { status: 'done' });
   room.command('t', { type: 'opening' }, 7);
   assert.deepEqual(room.roster()[0].opening, { status: 'waiting' }, 'replay resets statuses');

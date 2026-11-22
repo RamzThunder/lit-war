@@ -1,0 +1,5 @@
+.training-guide { position:absolute; z-index:3; top:24%; left:50%; transform:translate(-50%,-50%); width:max-content; max-width:min(440px,82%); padding:10px 16px; text-align:center; background:#102030ef; color:#f1f9ff; border:1px solid #81d9bd; border-radius:8px; pointer-events:none; }
+.training-guide strong,.training-guide span { display:block; }
+.training-guide span { font-size:13px; line-height:1.5; }
+.training-mini-hint { padding:10px; text-align:center; background:#173342; color:#e0fff4; }
+.guided-training #next-round,.guided-training #use-trap { display:none; }

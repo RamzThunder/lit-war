@@ -41,19 +41,26 @@ function download(file) {
   return job;
 }
 
-export function bindOpening(state) {
+export function bindOpening(state, tutorial) {
   const $ = selector => document.querySelector(selector);
   const root = $('#opening'), video = $('#opening-video');
   const playButton = $('#opening-play'), wait = $('#opening-wait'), skip = $('#opening-skip');
   const loading = $('#opening-loading'), bar = $('#opening-bar'), pctLabel = $('#opening-pct');
-  let source = '', job = null, reported = '';
+  let source = '', job = null, reported = '', tutorialId = null;
+  let learning = false;
   // Tell the teacher what this student is doing (loading %, waiting for a click, watching).
   const report = (status, pct) => {
     const key = `${status}:${pct ?? ''}`;
     if (key === reported || state.openingWatched) return;
     reported = key; state.send({ type: 'opening-status', status, ...(pct != null ? { pct } : {}) });
   };
-  const finish = () => { video.pause(); state.finishOpening(); };
+  const finish = () => {
+    if (learning || state.openingWatched || state.lesson?.phase !== 'opening') return;
+    video.pause(); learning = true; tutorialId = state.lesson.opening?.id;
+    video.hidden = true; playButton.hidden = true; skip.hidden = true; loading.hidden = true;
+    report('tutorial');
+    tutorial.start(() => { learning = false; state.finishOpening(); });
+  };
   async function play() {
     playButton.hidden = true;
     try { await video.play(); report('playing'); }
@@ -65,7 +72,7 @@ export function bindOpening(state) {
     }
   }
   function showProgress() {
-    if (root.hidden || state.openingWatched || !job) return;
+    if (root.hidden || learning || state.openingWatched || !job) return;
     if (job.url) {
       loading.hidden = true;
       if (source !== job.url) { source = job.url; skip.hidden = true; video.src = job.url; video.currentTime = 0; play(); }
@@ -85,8 +92,10 @@ export function bindOpening(state) {
     }
     const active = lesson?.phase === 'opening' && Boolean(VIDEO[team]);
     root.hidden = !active;
+    if (learning && (!active || tutorialId !== lesson?.opening?.id)) { learning = false; source = ''; tutorial.cancel(); }
     if (!active) { if (!video.paused) video.pause(); source = ''; reported = ''; return; }
     root.className = `opening ${team}`;
+    if (learning) return;
     const watching = !state.openingWatched;
     video.hidden = !watching;
     wait.hidden = watching;
@@ -97,11 +106,11 @@ export function bindOpening(state) {
       reported = '';
       playButton.hidden = true; skip.hidden = true; loading.hidden = true;
       const progress = lesson.opening;
-      $('#opening-progress').textContent = progress ? `${progress.done} / ${progress.total}명 시청 완료` : '';
+      $('#opening-progress').textContent = progress ? `${progress.done} / ${progress.total}명 준비 완료` : '';
     }
   }
   video.addEventListener('ended', finish);
-  video.addEventListener('error', () => { if (!root.hidden && !state.openingWatched) { skip.hidden = false; playButton.hidden = true; report('error'); } });
+  video.addEventListener('error', () => { if (!root.hidden && !learning && !state.openingWatched) { skip.hidden = false; playButton.hidden = true; report('error'); } });
   playButton.addEventListener('click', play);
   skip.addEventListener('click', finish);
   state.events.addEventListener('lesson', render);

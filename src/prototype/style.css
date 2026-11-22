@@ -151,3 +151,30 @@ body[data-team=blue] .s-actions #use-raid,body[data-team=blue] .s-actions #use-s
 #fs-gate kbd{background:var(--shell-raised);color:var(--shell-text);border:0;box-shadow:inset 0 0 0 1px var(--shell-line)}
 #fs-gate-enter{margin-top:24px;width:100%;padding:14px;font:inherit;font-weight:800;font-size:16px;border:0;border-radius:var(--r-sm);cursor:pointer;background:var(--side);color:#fff}
 body[data-team=solo] #fs-gate-enter{background:var(--text);color:var(--bg)}
+
+#interaction.shock-prompt, body.touch #interaction.shock-prompt {
+  top: 54%; bottom: auto; left: 50%; transform: translate(-50%, -50%);
+  background: #132439ef; color: #edf7ff; border: 1px solid #6997be; pointer-events: none;
+}
+#interaction.shock-prompt kbd { background: #253e58; color: #edf7ff; border: 1px solid #8fb9db; padding: 0 7px; }
+
+/* Keep the canvas's previous pixel width out of the grid's intrinsic size on resize. */
+.s-app { width:100%; grid-template-columns:minmax(0,1fr); }
+.s-game, .s-top, .s-hud { min-width:0; }
+.s-game #game, body.touch .s-game #game { width:100%; height:100%; min-height:0; }
+.s-game #game canvas { position:absolute; inset:0; }
+.s-net { grid-column:-2/-1; }
+@media(max-width:900px) {
+  .s-app { grid-template-rows:auto minmax(0,1fr) auto; }
+  .s-top { grid-template-columns:minmax(0,1fr) auto; padding:6px 10px; }
+  .s-net { grid-column:1/-1; justify-self:stretch; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
+  .s-hud { flex-wrap:wrap; padding:6px 10px; gap:6px 10px; }
+  .s-keys { display:none; }
+  .s-actions.hud-actions { flex-wrap:wrap; margin:0; }
+  .s-missions small { white-space:normal; }
+}
+@media(max-width:480px) {
+  .s-actions.hud-actions button { padding:6px; font-size:12px; }
+  .s-actions.hud-actions kbd { display:none; }
+  .s-map { top:8px; right:8px; }
+}

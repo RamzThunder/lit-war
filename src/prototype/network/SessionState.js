@@ -93,6 +93,31 @@ export class SessionState {
             else this.send({ type: 'ping' });
           }, 15000);
           this.publish(); break;
+        case 'error':
+          if (event.fatal) { this.status = event.message; fatal = true; }
+          else this.notice(event.message, 'warn');
+          break;
+        default: this.applyGameEvent(event);
+      }
+      this.sessionChanged();
+    });
+    socket.addEventListener('close', () => {
+      clearTimeout(timeout);
+      if (this.socket !== socket) return;
+      clearInterval(this.heartbeat); this.connected = false; this.players.clear();
+      if (this.raid) { this.raid = null; this.emit('raid-end', { aborted: true }); }
+      this.remote.terminalOpen = false; this.remote.round = null; this.publish();
+      if (!fatal && this.online && this.retry < 5) {
+        this.retry++; this.status = `재접속 대기 (${this.retry}/5)…`;
+        this.reconnectTimer = setTimeout(() => this.connectSocket(), Math.min(1000 * 2 ** (this.retry - 1), 8000));
+      } else if (!fatal) this.status = '연결할 수 없습니다. 서버 실행을 확인하고 다시 입장하세요.';
+      this.sessionChanged();
+    });
+    socket.addEventListener('error', () => { /* close drives the reconnect state */ });
+  }
+  applyGameEvent(event) {
+    if (event.me) this.me = event.me;
+    switch (event.type) {
         case 'state':
           this.setRemote(event.state); this.publish();
           if (event.result === 'repaired') this.notice('수리 완료! 다시 사용할 수 있어요.', 'good');
@@ -129,6 +154,8 @@ export class SessionState {
         case 'shock':
           if (this.raid) {
             this.raid.shocks = event.shocks; this.raid.stunnedUntil = performance.now() + event.stunMs;
+            this.raid.protectedUntil = this.raid.stunnedUntil + (event.invulnMs ?? 0);
+            this.raid.recoveryUntil = performance.now() + (event.recoveryMs ?? 0);
             if (this.raid.role === 'attacker') this.raid.opponent = { ...this.raid.opponent, ...event.defender };
           }
           this.emit('shock', event);
@@ -154,26 +181,7 @@ export class SessionState {
           this.notice(`⚠️ ${event.by}이(가) ${event.era}년대 ${event.kind === 'broken' ? '단말기를 고장 냈어요!' : '통로에 바리케이드를 쳤어요!'}`, 'bad');
           break;
         case 'correction': this.correction = event.player; break;
-        case 'error':
-          if (event.fatal) { this.status = event.message; fatal = true; }
-          else this.notice(event.message, 'warn');
-          break;
-      }
-      this.sessionChanged();
-    });
-    socket.addEventListener('close', () => {
-      clearTimeout(timeout);
-      if (this.socket !== socket) return;
-      clearInterval(this.heartbeat); this.connected = false; this.players.clear();
-      if (this.raid) { this.raid = null; this.emit('raid-end', { aborted: true }); }
-      this.remote.terminalOpen = false; this.remote.round = null; this.publish();
-      if (!fatal && this.online && this.retry < 5) {
-        this.retry++; this.status = `재접속 대기 (${this.retry}/5)…`;
-        this.reconnectTimer = setTimeout(() => this.connectSocket(), Math.min(1000 * 2 ** (this.retry - 1), 8000));
-      } else if (!fatal) this.status = '연결할 수 없습니다. 서버 실행을 확인하고 다시 입장하세요.';
-      this.sessionChanged();
-    });
-    socket.addEventListener('error', () => { /* close drives the reconnect state */ });
+    }
   }
   stopSocket() {
     clearTimeout(this.reconnectTimer); clearInterval(this.heartbeat);
@@ -219,7 +227,7 @@ export class SessionState {
   setTrap(era) { this.send({ type: 'trap', era }); }
   plantBait(value) { this.send({ type: 'bait', value }); }
   cleanse(id, value, at) { this.send({ type: 'cleanse', id, value, x: at.x, y: at.y }); }
-  shock() { this.send({ type: 'shock' }); }
+  shock() { if (!(performance.now() < this.raid?.protectedUntil)) this.send({ type: 'shock' }); }
   startSabotage() { this.send({ type: 'sabotage-start' }); }
   placeSabotage(kind, era) { this.send({ type: 'sabotage', kind, era }); }
 }
