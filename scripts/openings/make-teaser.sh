@@ -1,14 +1,16 @@
 #!/bin/sh
-# 공통 오프닝 v3(무음)로 gugeo.party '개발 중' 카드에 쓸 티저와 전체 보기용 압축본을 만든다.
+# 공통 오프닝 v3로 gugeo.party '개발 중' 카드에 쓸 티저와 전체 보기용 압축본을 만든다.
 # 사용법: sh scripts/openings/make-teaser.sh [출력 폴더]
 #   기본 출력: output/openings/common-propaganda-v3/teaser/
 #   - war-teaser.mp4   카드에서 소리 없이 반복 재생하는 약 40초 하이라이트 (H.264, 720p)
-#   - war-full.mp4     '전체 보기' 창에서 재생하는 127초 전체 (Cloudflare Pages 파일 한도 25MB 아래)
+#   - war-full.mp4     '전체 보기' 창에서 재생하는 127초 전체, 소리 있음 (Cloudflare Pages 파일 한도 25MB 아래)
+#   진영 오프닝(war-guardian.mp4, war-luddite.mp4)은 public/openings/*.mp4 를 그대로 복사한다.
 #   - war-teaser.webp  영상이 뜨기 전 보이는 포스터 (마지막 제목 화면)
 # 필요: ffmpeg (brew install ffmpeg), python3 + Pillow (포스터 WebP)
 set -eu
 cd "$(dirname "$0")/../.."
 SRC=output/openings/common-propaganda-v3/common-propaganda-v3-no-voice.mp4
+SOUND=output/openings/common-propaganda-v3/common-propaganda-v3-sound.mp4
 OUT=${1:-output/openings/common-propaganda-v3/teaser}
 mkdir -p "$OUT"
 
@@ -48,7 +50,7 @@ ffmpeg -v error -y -i "$SRC" -filter_complex "$filter" -map "[$prev]" -an \
   -c:v libx264 -preset slow -crf 20 -profile:v high -pix_fmt yuv420p -movflags +faststart \
   "$OUT/war-teaser.mp4"
 
-ffmpeg -v error -y -i "$SRC" -an \
+ffmpeg -v error -y -i "$SOUND" -c:a aac -b:a 128k \
   -c:v libx264 -preset slow -crf 22 -profile:v high -pix_fmt yuv420p -movflags +faststart \
   "$OUT/war-full.mp4"
 
@@ -56,4 +58,6 @@ ffmpeg -v error -y -ss 126.5 -i "$SRC" -frames:v 1 "$OUT/.poster.png"
 python3 -c "import sys;from PIL import Image;Image.open(sys.argv[1]).save(sys.argv[2],quality=85,method=6)" "$OUT/.poster.png" "$OUT/war-teaser.webp"
 rm -f "$OUT/.poster.png"
 
+cp public/openings/guardian.mp4 "$OUT/war-guardian.mp4"
+cp public/openings/luddite.mp4 "$OUT/war-luddite.mp4"
 ls -l "$OUT"
