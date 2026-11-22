@@ -21,6 +21,7 @@ export function bindHud(state) {
   $('#use-sabotage').addEventListener('click', () => state.startSabotage());
   // Compact era map (top right of the game): 8 cells coloured by the leading team, with a
   // yellow ring for a close match (<=10 points). Solo practice shows personal points instead.
+  let recommended = null;
   const renderBoard = () => {
     const { teams, scores } = state.board;
     $('#board-title').textContent = teams ? '점령 현황' : '내 복원 점수';
@@ -30,9 +31,9 @@ export function bindHud(state) {
       const s = scores[era];
       const cell = document.createElement('span');
       const owner = teams ? eraOwner(s) : s.blue ? 'blue' : 'empty';
-      cell.className = `s-cell ${owner}${teams && isClose(s) ? ' close' : ''}`;
+      cell.className = `s-cell ${owner}${teams && isClose(s) ? ' close' : ''}${era === recommended ? ' recommended' : ''}`;
       cell.textContent = era.slice(2);
-      cell.title = teams ? `${eraLabel(era)} · ${teamShort('blue')} ${s.blue} : ${s.red} ${teamShort('red')}${isClose(s) ? ' · 접전' : ''}` : `${eraLabel(era)} · ${s.blue}점`;
+      cell.title = teams ? `${eraLabel(era)} · ${teamShort('blue')} ${s.blue} : ${s.red} ${teamShort('red')}${isClose(s) ? ' · 접전' : ''}${era === recommended ? ' · 추천 단말기' : ''}` : `${eraLabel(era)} · ${s.blue}점`;
       return cell;
     }));
   };
@@ -99,8 +100,9 @@ export function bindHud(state) {
     $('#alert-seconds').textContent = eventLeft;
     $('#alert-detail').textContent = state.me?.team === 'red' ? '미션을 깨면 미끼를 심을 수 있어요 · 점수 2배' : '오염된 단말기를 찾아 정화하세요 · 점수 2배';
   };
-  return function tick({ raid, stunned, recovering, protectedNow }) {
+  return function tick({ raid, stunned, recovering, protectedNow, recommend }) {
     renderLesson();
+    if ((recommend?.era ?? null) !== recommended) { recommended = recommend?.era ?? null; renderBoard(); }
     const banner = $('#raid-banner');
     $('#room-owner').textContent = raid?.role === 'attacker' ? `${raid.opponent.name}의 기록실 (침입 중)` : '내 기록실';
     if (!raid) { if (!banner.hidden) { banner.hidden = true; bannerKey = ''; renderSession(); lessonKey = ''; } return; }

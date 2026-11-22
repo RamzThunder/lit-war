@@ -15,10 +15,14 @@ export function startTraining(state) {
   const student = room.sessions.get('student');
   const bot = room.sessions.get('bot');
   student.game = new GameState({ missions: 4 });
+  const firstTerminal = map.terminals[4];
+  // Practice scoreboard: my team leads everywhere except the exercise era, which it trails
+  // by 5 points, so the real recommendation rule picks that terminal.
+  const mine = student.profile.team, theirs = mine === 'blue' ? 'red' : 'blue';
+  for (const era of Object.keys(room.scores)) Object.assign(room.scores[era], era === firstTerminal.era ? { [mine]: 20, [theirs]: 25 } : { [mine]: 30, [theirs]: 10 });
   Object.assign(state, { online: true, connected: true, name: student.name, room: '연습', status: '튜토리얼',
     me: room.me('student'), scores: room.scores, players: room.sessions });
   state.setRemote(room.state('student'));
-  const firstTerminal = map.terminals[4];
   state.correction = { x: 218, y: firstTerminal.y };
   const guide = document.createElement('aside');
   guide.className = 'training-guide';
@@ -38,6 +42,7 @@ export function startTraining(state) {
   const start = { ...state.correction };
   state.training = {
     goal: null,
+    recommendEra: null,
     canInteract(target) {
       return target.era === firstTerminal.era && (((phase === 'terminal' || phase === 'alert-mission') && target.action === 'open') || (phase === 'cleanse' && target.action === 'cleanse') || (phase === 'repair' && target.action === 'repair'));
     },
@@ -45,7 +50,8 @@ export function startTraining(state) {
       if (phase !== 'move' || Math.hypot(player.x - start.x, player.y - start.y) < 24) return;
       phase = 'terminal';
       this.goal = firstTerminal;
-      say('② 빛나는 단말기를 찾으세요', '왼쪽 방의 파란 테두리의 단말기에 다가가 E를 누르세요. 터치 화면에서는 「기록 열기」예요.');
+      this.recommendEra = firstTerminal.era;
+      say('② 화살표를 따라 추천 단말기로', `화살표는 우리 진영이 밀리는 시대의 단말기를 가리켜요. ${firstTerminal.era}년대는 5점 차라 한 판이면 역전! 다가가 E를 누르세요. 터치 화면에서는 「기록 열기」예요.`);
     },
   };
   say('① 기록실을 걸어 보세요', '방향키나 WASD를 잠깐 눌러 이동하세요. 터치 화면에서는 왼쪽 조이스틱을 밀어요.');
@@ -57,7 +63,11 @@ export function startTraining(state) {
       miniHint.textContent = '⑦ 오염 경보 · 세 쌍을 연결하면 미끼를 심을 기회가 생겨요.';
       return;
     }
-    if (round.complete) miniHint.textContent = '④ 다섯 번째 미션 완료! 「기록실로 돌아가기」를 누르면 방해 공작을 사용할 수 있어요.';
+    if (round.complete) {
+      const score = room.scores[firstTerminal.era], lead = score[mine] - score[theirs];
+      const flipped = lead > 0 ? `${firstTerminal.era}년대를 ${lead}점 차로 되찾았어요! 실전에서는 화살표가 다음 추천 단말기로 옮겨 가요. ` : '';
+      miniHint.textContent = `④ 다섯 번째 미션 완료! ${flipped}「기록실로 돌아가기」를 누르면 방해 공작을 사용할 수 있어요.`;
+    }
     else {
       const count = round.matched.length;
       miniHint.textContent = count ? `③ ${count} / 3쌍 연결! 남은 작가와 작품도 연결하세요.` :
@@ -113,7 +123,8 @@ export function startTraining(state) {
       if (data.type === 'state' && phase === 'mission' && !data.state.terminalOpen) {
         phase = 'terminal';
         state.training.goal = firstTerminal;
-        say('② 단말기를 다시 열어 보세요', '파란 테두리의 단말기에서 E 또는 「기록 열기」를 누르세요.');
+        state.training.recommendEra = firstTerminal.era;
+        say('② 추천 단말기를 다시 열어 보세요', '화살표가 가리키는 단말기에서 E 또는 「기록 열기」를 누르세요.');
       }
       if (data.type === 'bait-offer' && phase === 'alert-mission') {
         // The offer opens over the completed terminal. Return to the map under it.
@@ -185,6 +196,7 @@ export function startTraining(state) {
       student.game.chooseGame('wiring');
       if (phase !== 'alert-mission') phase = 'mission';
       state.training.goal = null;
+      state.training.recommendEra = null;
       deliver([{ to: 'student', data: { type: 'state', state: room.state('student') } }]);
       return;
     }

@@ -135,8 +135,8 @@ export function bindUI(state) {
   let lastContext = '';
   return context => {
     hudTick(context);
-    const { open, target, raid, inRange, stunned } = context;
-    const key = `${open}:${target?.action}:${target?.kind}:${target?.era}:${raid?.role}:${inRange}:${stunned}`;
+    const { open, target, raid, inRange, stunned, recommend } = context;
+    const key = `${open}:${target?.action}:${target?.kind}:${target?.era}:${raid?.role}:${inRange}:${stunned}:${recommend?.era}:${recommend?.reason}`;
     if (key === lastContext) return;
     lastContext = key;
     let prompt = '', status;
@@ -149,7 +149,7 @@ export function bindUI(state) {
     else if (target?.action === 'open') { prompt = `<kbd>E</kbd> ${eraLabel(target.era)} 기록 열기`; status = '접속 가능 · E 키를 누르세요'; }
     else if (target?.action === 'cleanse') { prompt = `<kbd>E</kbd> 🧪 오염된 기록 정화`; status = '가짜 기록 발견 · E 키로 정화 (기회 한 번)'; }
     else if (target?.action === 'repair') { prompt = `<kbd>E</kbd> ${target.kind === 'broken' ? '고장 난 단말기 수리' : '바리케이드 치우기'}`; status = '방해 공작 발견 · E 키로 수리'; }
-    else status = '단말기에 접근하세요';
+    else status = recommend ? `➜ 추천 ${recommend.label} · ${recommend.reason}` : '단말기에 접근하세요';
     $('#interaction').classList.toggle('shock-prompt', raid?.role === 'attacker');
     $('#interaction').innerHTML = prompt;
     $('#interaction').hidden = !prompt;

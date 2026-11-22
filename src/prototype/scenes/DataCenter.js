@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { map, movementVector, nearestTerminal, isNearDoor, terminalSolid, doorFor, terminalFor } from '../map.js';
 import { CHARACTER_SCALE, animateCharacter, playShock, createTextures, preloadCharacters, sizeCharacter } from '../assets/createTextures.js';
 import { drawArchive, drawSabotages, preloadArchive } from './drawArchive.js';
+import { Recommender } from '../recommend.js';
 const SHOCK_RANGE = 40;
 export class DataCenter extends Phaser.Scene {
   constructor(state, updateContext, touch) { super('DataCenter'); this.state = state; this.updateContext = updateContext; this.touch = touch; this.direction = 'down'; }
@@ -34,6 +35,13 @@ export class DataCenter extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif', fontSize: '9px', fontStyle: 'bold', resolution: 3, color: '#ecf6ff',
     }).setOrigin(.5);
     this.objectHint = this.add.container(0, 0, [keycap, glyph]).setDepth(1000).setVisible(false);
+    // Recommended terminal: a bobbing marker over it, or an arrow at the screen edge.
+    this.recommender = new Recommender();
+    this.recArrow = this.add.graphics().setDepth(1001).setVisible(false);
+    this.recLabel = this.add.text(0, 0, '', {
+      fontFamily: 'Pretendard Variable, sans-serif', fontSize: '9px', fontStyle: 'bold', resolution: 3,
+      color: '#ffffff', backgroundColor: '#0d1a26e6', padding: { x: 3, y: 1 },
+    }).setOrigin(.5).setDepth(1001).setVisible(false);
     if (this.state.training) {
       // Dilate the console artwork's alpha mask, then cut out its original silhouette.
       const texture = this.textures.createCanvas('console-outline', 132, 76);
@@ -143,6 +151,34 @@ export class DataCenter extends Phaser.Scene {
     else if (target.action === 'open') this.state.openTerminal(target.era, at);
     else this.state.openRepair(target.kind, target.era, at);
   }
+  drawRecommendation(recommend, time, hidden) {
+    const terminal = recommend && terminalFor(recommend.era);
+    const show = Boolean(terminal) && !hidden;
+    this.recArrow.setVisible(show); this.recLabel.setVisible(show);
+    if (!show) return;
+    const color = this.state.me?.team === 'red' ? 0xff7a66 : 0x55adff;
+    const view = this.cameras.main.worldView;
+    const goal = { x: terminal.x, y: terminal.y - 8 };
+    const margin = 20;
+    const pulse = .8 + .2 * Math.sin(time / 260);
+    this.recArrow.clear().fillStyle(color, pulse).lineStyle(1.5, 0x08121b, .9);
+    if (Phaser.Geom.Rectangle.Contains(Phaser.Geom.Rectangle.Inflate(Phaser.Geom.Rectangle.Clone(view), -margin, -margin), goal.x, goal.y)) {
+      // On screen: a downward arrow bobbing above the console.
+      const y = terminal.y - 50 + Math.sin(time / 220) * 3;
+      this.recArrow.setPosition(terminal.x, y).setRotation(Math.PI / 2);
+      this.recLabel.setText('추천').setPosition(terminal.x, y - 15);
+    } else {
+      // Off screen: an arrow on the screen edge pointing straight at the terminal.
+      const cx = view.centerX, cy = view.centerY;
+      const dx = goal.x - cx, dy = goal.y - cy;
+      const halfW = view.width / 2 - margin, halfH = view.height / 2 - margin;
+      const scale = Math.min(halfW / Math.abs(dx || 1e-6), halfH / Math.abs(dy || 1e-6));
+      const x = cx + dx * scale, y = cy + dy * scale, angle = Math.atan2(dy, dx);
+      this.recArrow.setPosition(x, y).setRotation(angle);
+      this.recLabel.setText(`추천 ${recommend.era}`).setPosition(x - Math.cos(angle) * 22, y - Math.sin(angle) * 14);
+    }
+    this.recArrow.fillTriangle(11, 0, -7, -8, -7, 8).strokeTriangle(11, 0, -7, -8, -7, 8);
+  }
   renderSabotages() {
     const trap = this.state.raid?.role !== 'attacker' && this.state.me?.trap;
     const list = [...this.state.roomSabotages(), ...(trap ? [{ kind: 'trap', era: trap }] : [])];
@@ -224,7 +260,9 @@ export class DataCenter extends Phaser.Scene {
       const anchor = door || terminalFor(target.era);
       this.objectHint.setPosition(anchor.x + (door ? door.width / 2 : 0), anchor.y - (door ? 17 : 28));
     }
-    const context = { open, target, raid, inRange, stunned, recovering, protectedNow };
+    const recommend = this.recommender.update(this.state);
+    this.drawRecommendation(recommend, time, open || modal);
+    const context = { open, target, raid, inRange, stunned, recovering, protectedNow, recommend };
     this.updateContext(context); this.touch?.update(context);
   }
 }
