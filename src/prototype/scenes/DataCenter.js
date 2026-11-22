@@ -43,6 +43,7 @@ export class DataCenter extends Phaser.Scene {
       color: '#ffffff', backgroundColor: '#0d1a26e6', padding: { x: 3, y: 1 },
     }).setOrigin(.5).setDepth(1001).setVisible(false);
     if (this.state.training) {
+      const red = this.state.me?.team === 'red';
       // Dilate the console artwork's alpha mask, then cut out its original silhouette.
       const texture = this.textures.createCanvas('console-outline', 132, 76);
       const ctx = texture.context;
@@ -51,12 +52,12 @@ export class DataCenter extends Phaser.Scene {
         ctx.drawImage(consoleImage, 2 + dx, 2 + dy, 128, 72);
       }
       ctx.globalCompositeOperation = 'source-in';
-      ctx.fillStyle = '#55adff'; ctx.fillRect(0, 0, 132, 76);
+      ctx.fillStyle = red ? '#ff7a66' : '#55adff'; ctx.fillRect(0, 0, 132, 76);
       ctx.globalCompositeOperation = 'destination-out';
       ctx.drawImage(consoleImage, 2, 2, 128, 72);
       texture.refresh();
       this.consoleOutline = this.add.image(0, 0, 'console-outline').setDisplaySize(66, 38).setDepth(5).setVisible(false);
-      this.doorOutline = this.add.rectangle(0, 0, 22, 60).setStrokeStyle(1, 0x55adff).setDepth(5).setVisible(false);
+      this.doorOutline = this.add.rectangle(0, 0, 22, 60).setStrokeStyle(1, red ? 0xff7a66 : 0x55adff).setDepth(5).setVisible(false);
     }
     this.opponent = null;
     this.nameLabel = this.add.text(this.player.x, this.player.y - 38, '나', { fontSize: '9px', fontFamily: 'sans-serif', color: '#d7fff0', backgroundColor: '#10232c' }).setOrigin(.5).setDepth(20);
