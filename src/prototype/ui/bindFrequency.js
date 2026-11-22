@@ -1,3 +1,4 @@
+import { showSignal } from './recordInstruments.js';
 import { frequencyRecords as byEra, isTuned, wavePath } from '../minigames/frequency.js';
 import { eraLabel } from '../minigames/wiring.js';
 export function bindFrequency(state) {
@@ -19,6 +20,7 @@ export function bindFrequency(state) {
     const tuned = isTuned(round);
     $('#frequency-stage').textContent = round.complete ? '3 / 3 복구' : `${stage + 1} / 3`;
     slider.value = round.value;
+    showSignal($('#signal-meter'), round.value, round.targets[stage]);
     slider.disabled = round.complete;
     $('#frequency-value').textContent = round.value;
     $('#target-wave').setAttribute('d', wavePath(round.targets[stage]));

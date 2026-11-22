@@ -1,3 +1,5 @@
+import { bookBoard, identityBoard, shooterBoard } from './prototype/ui/directControls.js';
+import { instrumentScene, showSequence, showSignal } from './prototype/ui/recordInstruments.js';
 import { GameState } from './prototype/state/GameState.js';
 import { createMissionRound, MISSION_LABEL } from './prototype/minigames/missionTypes.js';
 import { ERAS, wiringRecords, shuffledIds, recordById } from './prototype/minigames/wiring.js';
@@ -24,7 +26,8 @@ const instructions = {
   wiring: '작가를 누른 뒤 해당 작품을 누르면 배선이 연결됩니다.',
   frequency: '슬라이더로 두 파형을 겹친 뒤 신호를 복구하세요.',
 };
-let era = '1930', type = 'memory', game, selected = null, memoryTimer;
+const requestedMission = new URLSearchParams(location.search).get('mission');
+let era = '1930', type = types.includes(requestedMission) ? requestedMission : 'memory', game, selected = null, memoryTimer;
 const node = (tag, className = '', label = '') => { const el = document.createElement(tag); el.className = className; el.textContent = label; return el; };
 const button = (label, action) => { const el = node('button', '', label); el.type = 'button'; el.addEventListener('click', action); return el; };
 const feedback = message => { $('#feedback').textContent = message; };
@@ -52,6 +55,7 @@ function render({ round }) {
   const [progress, total] = EXTRA_TYPES.includes(type) ? extraProgress(round) : [round.matched?.length ?? round.hit?.length ?? round.picked?.length ?? round.stage ?? 0, type === 'filter' ? 6 : 3];
   $('#mission-progress').textContent = `${progress} / ${total}`;
   $('#completed').hidden = !round.complete;
+  content.dataset.mission = type;
   content.replaceChildren();
   if (round.complete) return;
 
@@ -62,7 +66,9 @@ function render({ round }) {
 
   if (type === 'memory') {
     const showing = Date.now() < round.revealUntil;
-    content.append(node('div', 'card', showing ? round.order.join('  →  ') : '기록이 가려졌습니다. 기억한 순서대로 선택하세요.'));
+    const display = node('div', 'card');
+    showSequence(display, round, showing);
+    content.append(instrumentScene('memory', display));
     const box = choices();
     for (const word of round.options) {
       const b = button(word, () => tryAction(game.recall(word), '순서를 이어 가세요.'));
@@ -70,36 +76,16 @@ function render({ round }) {
     }
     if (showing) { clearTimeout(memoryTimer); memoryTimer = setTimeout(() => render(game.snapshot), round.revealUntil - Date.now() + 20); }
   } else if (type === 'shooter') {
-    content.append(node('p', 'label', `정상 키워드 · ${frequencyRecords[era].map(r => r.word).join(' / ')}`));
-    const box = choices();
-    for (const word of round.targets) {
-      const b = button(word, () => tryAction(game.shoot(word), '오염 데이터 격추!'));
-      b.disabled = round.hit.includes(word); b.classList.toggle('done', b.disabled); box.append(b);
-    }
+    content.append(shooterBoard(round, word => tryAction(game.shoot(word), '오염 신호 격추!')));
   } else if (type === 'identity') {
-    const current = record(round.order[round.stage]);
-    content.append(node('div', 'card', current.author));
-    const box = choices();
-    for (const r of wiringRecords[era]) {
-      const b = button(`「${r.title}」`, () => { selected = r.id; box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
-      box.append(b);
-    }
-    const label = node('p', 'label', '작품을 선택하고 카드를 오른쪽으로 밀어 주세요');
-    const slider = document.createElement('input'); Object.assign(slider, { type: 'range', min: 0, max: 100, value: 0, className: 'meter' });
-    slider.addEventListener('input', () => { if (Number(slider.value) < 85) return; if (!selected) { slider.value = 0; feedback('작품을 먼저 선택하세요.'); return; } const answer = selected; selected = null; tryAction(game.verifyIdentity(current.id, answer, true)); slider.value = 0; });
-    content.append(label, slider);
+    content.append(identityBoard(round, (...args) => game.verifyIdentity(...args)));
   } else if (type === 'filter') {
     const r = record(round.order[round.stage]);
-    content.append(node('div', 'card', `${r.author} · 「${r.title}」`));
+    content.append(instrumentScene('sort-chutes', node('div', 'card', `${r.author} · 「${r.title}」`)));
     const box = choices();
     box.append(button(`${era}년대 기록`, () => tryAction(game.classify(r.id, 'current'))), button('다른 시대 기록', () => tryAction(game.classify(r.id, 'other'))));
   } else if (type === 'chronology') {
-    const box = choices();
-    for (const id of round.order) {
-      const r = record(id);
-      const b = button(`「${r.title}」 · ${r.year}${r.yearNote ? ` ${r.yearNote}` : ''}`, () => tryAction(game.shelve(id), '책을 꽂았습니다.'));
-      b.disabled = round.picked.includes(id); b.classList.toggle('done', b.disabled); box.append(b);
-    }
+    content.append(bookBoard(round, id => tryAction(game.shelve(id), '책을 꽂았습니다.')));
   } else if (type === 'wiring') {
     const pair = node('div', 'pair'); const authors = node('div', 'choices'); const works = node('div', 'choices');
     authors.style.gridTemplateColumns = works.style.gridTemplateColumns = '1fr';
@@ -112,7 +98,19 @@ function render({ round }) {
       const b = button(`「${r.title}」`, () => { if (!selected) { feedback('왼쪽에서 작가를 먼저 고르세요.'); return; } const answer = selected; selected = null; tryAction(game.connect(answer, id)); });
       b.disabled = round.matched.includes(id); works.append(b);
     }
-    pair.append(authors, works); content.append(pair);
+    const cables = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    cables.setAttribute('viewBox', '0 0 100 300');
+    cables.setAttribute('preserveAspectRatio', 'none');
+    cables.setAttribute('aria-hidden', 'true');
+    for (const id of round.matched) {
+      const left = wiringRecords[era].findIndex(r => r.id === id) * 100 + 50;
+      const right = round.order.indexOf(id) * 100 + 50;
+      const cable = document.createElementNS(cables.namespaceURI, 'path');
+      cable.setAttribute('d', `M0 ${left} C55 ${left} 45 ${right} 100 ${right}`);
+      cables.append(cable);
+    }
+    pair.classList.add('patchbay');
+    pair.append(authors, cables, works); content.append(pair);
   } else {
     const stage = round.stage;
     content.append(node('p', 'label', `신호 복구 ${stage + 1} / 3 · ${frequencyRecords[era][stage].word}`));
@@ -120,11 +118,13 @@ function render({ round }) {
     const target = document.createElementNS('http://www.w3.org/2000/svg', 'path'); target.classList.add('target'); target.setAttribute('d', wavePath(round.targets[stage]));
     const live = document.createElementNS('http://www.w3.org/2000/svg', 'path'); live.classList.add('live'); live.setAttribute('d', wavePath(round.value)); svg.append(target, live);
     const slider = document.createElement('input'); Object.assign(slider, { type: 'range', min: 0, max: 100, value: round.value, className: 'meter' });
+    const meter = node('meter');
+    showSignal(meter, round.value, round.targets[stage]);
     const output = node('p', 'label', `수신 주파수 ${round.value}`);
     const lock = button('파형을 맞춰 주세요', () => { game.tune(Number(slider.value)); tryAction(game.lockFrequency(), '신호 복구!'); });
     lock.className = 'action'; lock.disabled = Math.abs(round.value - round.targets[stage]) > TOLERANCE;
-    slider.addEventListener('input', () => { const value = Number(slider.value); live.setAttribute('d', wavePath(value)); output.textContent = `수신 주파수 ${value}`; lock.disabled = Math.abs(value - round.targets[stage]) > TOLERANCE; lock.textContent = lock.disabled ? '파형을 맞춰 주세요' : '신호 일치 · 복구하기'; });
-    content.append(svg, output, slider, lock);
+    slider.addEventListener('input', () => { const value = Number(slider.value); live.setAttribute('d', wavePath(value)); showSignal(meter, value, round.targets[stage]); output.textContent = `수신 주파수 ${value}`; lock.disabled = Math.abs(value - round.targets[stage]) > TOLERANCE; lock.textContent = lock.disabled ? '파형을 맞춰 주세요' : '신호 일치 · 복구하기'; });
+    content.append(instrumentScene('receiver', svg), meter, output, slider, lock);
   }
 }
 for (const value of ERAS) { const option = node('option', '', `${value}년대`); option.value = value; $('#era').append(option); }
