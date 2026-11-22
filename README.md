@@ -5,7 +5,7 @@ Phaser 3 + JavaScript + Vite로 만든 탑다운 픽셀 게임입니다.
 Cloudflare Workers + SQLite 기반 Durable Objects + WebSocket을 사용합니다.
 Firebase는 새 게임에서 사용하지 않습니다.
 
-**배포 주소:** https://lit-war-multiplayer.gugeo.workers.dev (2026-11-16 배포, `npm run deploy`)
+**배포 주소:** https://lit-war-multiplayer.gugeo.workers.dev (2026-11-22 배포, `npm run deploy`)
 
 ## 바로 실행
 
