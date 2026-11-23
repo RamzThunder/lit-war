@@ -22,7 +22,6 @@ ALARM_END = ALARM_START + SCENES[3][2]           # The dialogue cut begins.
 DOOR_SHUT = ALARM_START + 1.92                   # The doors meet on screen.
 _warning = SCENES[3][1].split('|')
 DENIED = ALARM_START + SCENES[3][2] * len(_warning[0]) / sum(map(len, _warning))  # "양측 접근 차단" appears.
-MUSIC_FADE = sum(row[2] for row in SCENES[:-3]) + BRIDGE - 2
 MUSIC_LOW = 0.58     # A soft dip: the score keeps playing under the alarm.
 MUSIC_DIP = 0.7
 MUSIC_BACK = 2.0
@@ -90,27 +89,54 @@ def write_wave(path, mix):
         file.writeframes(pcm.tobytes())
 
 
-def main():
+def gate_beep(mix, at):
+    """A short refusal from the locked door."""
+    for index in range(2):
+        t = np.arange(round(.13 * RATE)) / RATE
+        add(mix, at + index * .19, edges(.09 * harsh(2 * np.pi * 330 * t), .006, .03))
+
+
+def sit_thud(mix, at):
+    """Someone drops onto the metal bench."""
+    t = np.arange(round(.42 * RATE)) / RATE
+    body = np.sin(2 * np.pi * (92 - 30 * t) * t) * np.exp(-13 * t)
+    ring = np.sin(2 * np.pi * 410 * t) * np.exp(-24 * t)
+    add(mix, at, edges(.34 * body + .035 * ring, .002, .04), .45)
+
+
+def write_audio(target, length=LENGTH, cues=()):
+    """Mix the score, the lockdown alarm, and any later one-shot cues."""
     rng = np.random.default_rng(2030)
-    mix = np.zeros((round(LENGTH * RATE), 2))
+    mix = np.zeros((round(length * RATE), 2))
     siren(mix)
     door(mix, rng)
     denied(mix, rng)
+    for cue, at in cues:
+        cue(mix, at)
+    fade = length - 9  # The score ends before the black card and closing lines.
     duck = (f"volume='if(lt(t,{ALARM_START - MUSIC_DIP}),1,"
             f"if(lt(t,{ALARM_START}),1-(t-{ALARM_START - MUSIC_DIP})/{MUSIC_DIP}*{1 - MUSIC_LOW},"
             f"if(lt(t,{ALARM_END - .4}),{MUSIC_LOW},"
             f"if(lt(t,{ALARM_END - .4 + MUSIC_BACK}),{MUSIC_LOW}+(t-{ALARM_END - .4})/{MUSIC_BACK}*{1 - MUSIC_LOW},1))))':eval=frame")
-    graph = (f'[1:a]aresample={RATE},afade=in:d=1,afade=out:st={MUSIC_FADE}:d=2,apad,atrim=duration={LENGTH},{duck}[music];'
-             '[music][2:a]amix=inputs=2:duration=first:normalize=0,'
+    graph = (f'[0:a]aresample={RATE},afade=in:d=1,afade=out:st={fade}:d=2,apad,atrim=duration={length},{duck}[music];'
+             '[music][1:a]amix=inputs=2:duration=first:normalize=0,'
              'alimiter=limit=0.9:level=0:latency=1,aresample=48000[out]')
-    with TemporaryDirectory(dir=TARGET.parent) as directory:
+    with TemporaryDirectory(dir=Path(target).parent) as directory:
         effects = Path(directory) / 'alarm.wav'
-        staged = Path(directory) / TARGET.name
         write_wave(effects, mix)
-        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(SOURCE), '-i', str(MUSIC), '-i', str(effects),
-                        '-filter_complex', graph, '-map', '0:v:0', '-map', '[out]', '-c:v', 'copy',
-                        '-c:a', 'aac', '-b:a', '192k', '-t', str(LENGTH), '-movflags', '+faststart', str(staged)],
-                       check=True)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(MUSIC), '-i', str(effects),
+                        '-filter_complex', graph, '-map', '[out]', '-c:a', 'aac', '-b:a', '192k',
+                        '-t', str(length), str(target)], check=True)
+
+
+def main():
+    with TemporaryDirectory(dir=TARGET.parent) as directory:
+        audio = Path(directory) / 'mix.m4a'
+        staged = Path(directory) / TARGET.name
+        write_audio(audio)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(SOURCE), '-i', str(audio),
+                        '-map', '0:v:0', '-map', '1:a', '-c', 'copy', '-t', str(LENGTH),
+                        '-movflags', '+faststart', str(staged)], check=True)
         staged.replace(TARGET)
     print(TARGET)
 
