@@ -59,8 +59,13 @@ def run_film(name: str, document: Path, preview_at: float | None = None) -> Path
     # Keep the existing MP4 intact if compilation, layout checks, or encoding fails.
     with TemporaryDirectory(prefix='opening-render-') as temporary:
         env = dict(os.environ, OPENING_STORYBOARD=str(document), OPENING_OUTPUT_DIR=temporary)
-        command = ['swift', '-module-cache-path', '/private/tmp/lit-war-swift-cache',
-                   str(ROOT / 'scripts/openings' / source)]
+        executable = Path(temporary) / 'render'
+        subprocess.run([
+            'swiftc', '-O', '-suppress-warnings', '-module-cache-path',
+            '/private/tmp/lit-war-swift-cache', str(ROOT / 'scripts/openings' / source),
+            '-o', str(executable),
+        ], cwd=ROOT, env=env, check=True)
+        command = [str(executable)]
         if preview_at is not None:
             command += ['--preview-at', str(preview_at)]
         subprocess.run(command, cwd=ROOT, env=env, check=True)

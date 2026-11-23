@@ -1,5 +1,7 @@
 # 2030 — 현대문학사 데이터 점령전
 
+**영상 콘티 편집** · [엔딩 3편](docs/엔딩-콘티.md) · [오프닝 3편](docs/영상-3편-콘티와-대사.md)
+
 Phaser 3 + JavaScript + Vite로 만든 탑다운 픽셀 게임입니다.
 싱글플레이와 **최대 30명 교실 멀티플레이**를 지원합니다. 실시간 연결은
 Cloudflare Workers + SQLite 기반 Durable Objects + WebSocket을 사용합니다.

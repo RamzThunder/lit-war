@@ -280,10 +280,10 @@ func draw(_ c:CGContext,_ t:Double) {
         }
         label(c,scriptText("G055"),640,252,32,ink,true)
         subtitle(c,[scriptText("G056")])
-    } else if t<77 {
+    } else if t<75 {
         interruptedSignal(c,t-69)
     } else {
-        let u=t-77
+        let u=t-75
         card(c,150,238,980,320,yellow)
         label(c,scriptText("G057"),640,460,48,ink,true)
         label(c,scriptText("G031"),640,375,58,ink,true)
@@ -291,7 +291,7 @@ func draw(_ c:CGContext,_ t:Double) {
         confetti(c,u)
         subtitle(c,[scriptText("G059")])
     }
-    if t<69 || t>=77 {ticker(c,scriptText("G060"),t)}
+    if t<69 || t>=75 {ticker(c,scriptText("G060"),t)}
     let fade=min(1,t/0.35)*min(1,max(0,(duration-t)/0.5))
     if fade<1 {rect(c,0,0,1280,720,cream.withAlphaComponent(1-fade))}
 }
