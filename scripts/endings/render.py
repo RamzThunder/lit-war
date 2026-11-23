@@ -8,7 +8,11 @@ films = read_board()
 music_files = {'guardian': 'assets/music/endings/guardian-final-system-message.m4a', 'luddite': 'assets/music/endings/luddite-recovered-data.m4a', 'draw': 'assets/music/endings/draw-the-last-archive.m4a'}
 parser = argparse.ArgumentParser()
 parser.add_argument('film', nargs='?', choices=['all',*films], default='all')
-selection = parser.parse_args().film
+parser.add_argument('--rough', action='store_true', help='Render draw only with the new still-image bridge to draw-rough.mp4')
+args = parser.parse_args()
+selection = args.film
+if args.rough and selection != 'draw':
+    parser.error('--rough requires draw')
 for name, scenes in films.items():
     if selection in ("all", name):
-        render_movie(name, music_files[name], scenes)
+        render_movie(name, music_files[name], scenes, rough=args.rough)

@@ -83,7 +83,7 @@ func drawDrawCaption() {
     let name = NSMutableAttributedString(attributedString:words(label,24))
     name.addAttribute(.foregroundColor,value:accent,range:NSRange(location:0,length:name.length))
     name.draw(at:NSPoint(x:x+62,y:top-39))
-    if !a[3].isEmpty {
+    if !a[3].isEmpty && !(warning && a[3]=="HUMAN") {
         let context = warning ? a[3].components(separatedBy:"/").last!.trimmingCharacters(in:.whitespaces) : a[3]
         words(context,20,true).draw(at:NSPoint(x:x+82+name.size().width,y:top-36))
     }

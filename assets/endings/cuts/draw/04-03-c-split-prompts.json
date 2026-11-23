@@ -1,0 +1,27 @@
+{
+  "tool": "built-in image_gen",
+  "images": [
+    {
+      "file": "04-03-c-standing.png",
+      "prompt": "Use case: precise-object-edit. Edit ONLY the LEFT seated person in this image to make them STANDING immediately in front of their own far-left end of the bench, ready to sit. Feet on the paving on the CAMERA SIDE of the bench, hips immediately ahead of the left seat. Show their BACK and back of short dark bob hairstyle, no face or facial profile at all. Same navy ankle-length uniform coat with champagne trim and same archive emblem, matching original identity and natural adult anatomy. Hold the same paper loosely at their side. This is the earlier keyframe before the left person sits. Preserve the RIGHT standing person EXACTLY unchanged: same position, posture, body scale, clothing, hair, bag, red strap crossing over the centered red back emblem, paper and shoes. Both people should have plausible comparable adult heights, feet on same ground plane; do not shift right person. Keep the empty middle of the bench and entire background, architecture, red locked door, tree, wet ground, camera framing and overcast light unchanged. One landscape frame with same aspect ratio and detailed painted cinematic anime style. No additional people, no text, no watermark."
+    },
+    {
+      "file": "04-03-c-left-seated.png",
+      "prompt": "Use case: precise-object-edit. Create an intermediate animation keyframe by editing this exact image. Change ONLY the RIGHT person from seated to standing upright immediately in front of their own far-right seat, ready to sit down. Their feet rest on the paving on the CAMERA SIDE of the bench, their hips just ahead of the seat, not behind the bench. Keep their body oriented slightly outward right but show their BACK and back of head only; absolutely no facial profile, nose, eyes or mouth. They hold their same paper loosely at their side. Natural full standing anatomy, consistent adult proportions and scale relative to the seated person and bench; head will be higher in frame. Preserve right person's curly dark hair, charcoal hooded jacket, bag, red strap and SAME red back emblem centered on jacket beneath the strap, partly occluded by it. The LEFT person stays seated EXACTLY as in the source, same pose, paper, clothes and silhouette. Preserve the entire background and bench pixel-aligned as closely as possible: locked door, wet courtyard, bare tree, cloudy blue-grey daylight, camera position, framing. Wide landscape same aspect, same detailed painted cinematic anime style. Empty middle of bench. No new people, text or watermark. One frame only."
+    }
+  ],
+  "videos": [
+    {
+      "start": "04-03-c-standing.png",
+      "end": "04-03-c-left-seated.png",
+      "seconds": 2.1,
+      "prompt": "The person on the left turns slightly toward the left and slowly sits down on the left end of the bench, placing their paper on their lap. The person on the right stays standing completely still. Match the ending image. Keep both faces hidden and the camera fixed. No cuts or zoom."
+    },
+    {
+      "start": "Use the actual last frame of the first generated video; planned keyframe: 04-03-c-left-seated.png",
+      "end": "04-03-c-v2.png",
+      "seconds": 2.1,
+      "prompt": "The person on the right turns slightly toward the right and slowly sits down on the right end of the bench, briefly resting one hand on the seat and placing their paper on their lap. The person on the left remains seated and still. Match the ending image. Keep both faces hidden and the camera fixed. No cuts or zoom."
+    }
+  ]
+}

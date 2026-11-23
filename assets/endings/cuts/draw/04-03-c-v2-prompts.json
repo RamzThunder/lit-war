@@ -1,0 +1,20 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "04-03-c.png",
+  "images": [
+    {
+      "file": "04-03-c-empty.png",
+      "prompt": "Use case: precise-object-edit. Edit the provided image into the EMPTY BENCH starting keyframe for this exact scene. Remove BOTH seated people completely, including all clothing, bags, papers, pens, shoes, hands and shadows attributable to them. Reconstruct the continuous empty metal bench slats, legs and wet courtyard paving naturally where the people were. Keep the entire rest of the image unchanged: identical fixed camera, framing and landscape aspect ratio, bench position and size, archive facade and closed door, red lock lights, bare trees, cloudy daylight, distant skyline, muted cold blue-grey palette, and detailed painted cinematic anime illustration style. No people anywhere, no objects left on bench. No text, no watermark. This must align with the original occupied bench scene for a start/end frame video."
+    },
+    {
+      "file": "04-03-c-v2.png",
+      "prompt": "Use case: precise-object-edit. Make ONLY one localized correction to the supplied image: reposition the red resistance emblem on the back of the RIGHT seated character's charcoal jacket. It is currently incorrectly shifted to the viewer-right of the diagonal red shoulder bag strap. Move the SAME emblem leftward onto the actual anatomical CENTER of the character's back, directly UNDERNEATH the diagonal bag strap. 'Underneath' means physical layering: the emblem is printed on the jacket fabric and the unchanged red strap passes IN FRONT OF / ACROSS the emblem, naturally occluding its central portion. Do not place it in the remaining exposed side panel just to keep the whole logo visible; partial strap occlusion is REQUIRED. Keep emblem design, scale and muted red color, matching fabric curvature/perspective; remove the old off-center emblem and restore plain jacket there. Keep bag and strap position absolutely unchanged. Preserve both people, poses, hands, papers, clothing, left character emblem, bench, entire environment, composition, lighting and style exactly. Faces remain invisible. No other edits, no new symbols, no text, no watermark."
+    }
+  ],
+  "video": {
+    "start": "04-03-c-empty.png",
+    "end": "04-03-c-v2.png",
+    "suggested_duration_seconds": 5,
+    "prompt": "A fixed wide shot of an empty metal bench outside a locked archive. The archivist in a navy coat enters from the left and sits at the far left end, facing outward to the left. A moment later, the luddite in a charcoal hooded jacket enters from the right and sits at the far right end, facing outward to the right, briefly resting one hand on the bench. Both carry sheets of paper and settle them on their laps. Leave a wide empty space between them. Their backs face the camera and their faces remain hidden throughout. The luddite's red emblem is centered on the back of the jacket, partially covered by the diagonal shoulder bag strap. Match the supplied ending frame. Keep the camera, bench, architecture, closed door, red lock lights, overcast daylight and illustrated style consistent. Natural walking and sitting, no teleportation, no cuts, no camera movement, no text."
+  }
+}

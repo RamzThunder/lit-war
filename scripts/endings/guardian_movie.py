@@ -6,9 +6,11 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 
-def render_movie(film, music, scenes):
+def render_movie(film, music, scenes, rough=False):
+    if rough and film != 'draw':
+        raise ValueError('The rough still-cut edit is only available for draw.')
     font = Path(os.environ.get('MONA_FONT', ROOT.parent/'censor-escape/fonts/Mona10x12.woff2'))
-    final = ROOT/f'output/endings/{film}.mp4'
+    final = ROOT/f'output/endings/{film}{"-rough" if rough else ""}.mp4'
     final.parent.mkdir(parents=True, exist_ok=True)
     def run(*args):
         subprocess.run(args, check=True, cwd=ROOT)
@@ -18,7 +20,10 @@ def render_movie(film, music, scenes):
         tmp = Path(directory)
         crest = ROOT/'assets/concept/logos'/('human-logo-white-glow.png' if film == 'draw' else f'{film}-logo.png')
         run('swiftc','-module-cache-path','/private/tmp/lit-war-swift-cache',ROOT/'scripts/endings/guardian-titles.swift','-o',tmp/'titles')
-        total = sum(row[2] for row in scenes)
+        bridge = [('04-03.mp4', 2), ('04-04.mp4', 2), ('04-03-c-empty.png', .5),
+                  ('04-03-c-standing.png', 1), ('04-03-c-left-seated.png', .75), ('04-03-c-v2.png', .75)] if rough else []
+        bridge_duration = sum(duration for _, duration in bridge)
+        total = sum(row[2] for row in scenes) + bridge_duration
         playlist = []
         shots = []
         for index, (title, body, duration) in enumerate(scenes):
@@ -30,8 +35,18 @@ def render_movie(film, music, scenes):
                 shots.append((index, style, clip, title, dialogue, bench_time))
                 clip, title, body, duration = '05-pens', '', narration, duration - bench_time
             shots.append((index, style, clip, title, body, duration))
+            if index == 4:
+                shots.extend((index, -1, still, '', '', seconds) for still, seconds in bridge)
         for i, (index, style, clip, title, body, duration) in enumerate(shots):
             overlay, segment = tmp/f'{i}.png', tmp/f'{i}.mp4'
+            if style == -1:
+                source = ROOT/f'assets/endings/cuts/draw/{clip}'
+                inputs = ['-i', source] if source.suffix == '.mp4' else ['-loop','1','-framerate','24','-i',source]
+                ff(*inputs,
+                   '-vf','fps=24,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1',
+                   '-an','-t',str(duration),'-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p',segment)
+                playlist.append(f"file '{segment}'")
+                continue
             captions = body.split('|') if 2 <= style <= 4 else [body]
             layers = []
             for j, caption in enumerate(captions):
@@ -46,6 +61,8 @@ def render_movie(film, music, scenes):
                 tail = (f'fade=t=out:st=1:d=1,tpad=stop_mode=add:stop_duration={duration}'
                         if film == 'guardian' and style == 5 else f'tpad=stop_mode=clone:stop_duration={duration}')
                 inputs = ['-i',src]
+                if rough and clip == '05':
+                    inputs = ['-loop','1','-framerate','24','-i',ROOT/'assets/endings/cuts/draw/04-03-c-v2.png']
                 speed = 1 if film == 'guardian' else min(1.7, duration / (5.06 if clip == '04-02' else 2.06))
                 graph = f'[0:v]setpts={speed}*PTS,fps=24,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,{tail}[shot0]'
                 start = 0.0
@@ -63,5 +80,5 @@ def render_movie(film, music, scenes):
             ff(*inputs,'-an','-t',str(duration),'-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p',segment)
             playlist.append(f"file '{segment}'")
         (tmp/'segments').write_text('\n'.join(playlist))
-        ff('-f','concat','-safe','0','-i',tmp/'segments','-i',ROOT/music,'-map','0:v','-map','1:a','-c:v','copy','-af',f'afade=in:d=1,afade=out:st={max(0,sum(row[2] for row in scenes[:-3])-2)}:d=2,apad','-t',str(total),'-c:a','aac','-movflags','+faststart',tmp/'finished.mp4')
+        ff('-f','concat','-safe','0','-i',tmp/'segments','-i',ROOT/music,'-map','0:v','-map','1:a','-c:v','copy','-af',f'afade=in:d=1,afade=out:st={max(0,sum(row[2] for row in scenes[:-3])+bridge_duration-2)}:d=2,apad','-t',str(total),'-c:a','aac','-movflags','+faststart',tmp/'finished.mp4')
         (tmp/'finished.mp4').replace(final)
