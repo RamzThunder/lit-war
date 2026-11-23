@@ -16,7 +16,7 @@ export const awayList = view => view.roster.filter(p => p.online && p.away).sort
 export function createRoom() {
   const listeners = new Set();
   const emit = (type, detail = {}) => { for (const fn of listeners) fn(type, detail); };
-  const view = { room: '', lesson: null, endsAt: null, eventEndsAt: null, scores: null, roster: [], feed: [], contam: [], raids: new Map(), watching: null, result: null };
+  const view = { room: '', lesson: null, endsAt: null, eventEndsAt: null, scores: null, ending: null, results: null, roster: [], feed: [], contam: [], raids: new Map(), watching: null, result: null };
   let socket = null, key = '', retry = 0, fatal = false, heartbeat = null, resultTimer = null;
 
   const send = data => { if (socket?.readyState !== WebSocket.OPEN) return false; socket.send(JSON.stringify(data)); return true; };
@@ -67,7 +67,7 @@ export function createRoom() {
     switch (event.type) {
       case 'teacher-welcome':
         retry = 0; store.set('teacher-room', view.room); store.set('teacher-key', key);
-        Object.assign(view, { scores: event.scores, roster: stampAway(event.roster), feed: event.feed ?? [], contam: event.contam ?? [] });
+        Object.assign(view, { scores: event.scores, ending: event.ending ?? null, results: event.results ?? null, roster: stampAway(event.roster), feed: event.feed ?? [], contam: event.contam ?? [] });
         setLesson(event.lesson);
         view.raids.clear(); view.watching = null; view.result = null;
         for (const raid of event.raids ?? []) addRaid(raid);
@@ -78,6 +78,8 @@ export function createRoom() {
         break;
       case 'lesson': setLesson(event.lesson); emit('lesson'); break;
       case 'scores': view.scores = event.scores; emit('scores'); break;
+      case 'ending': view.ending = event.ending; emit('ending'); break;
+      case 'results': view.results = event.results; emit('results', { live: true }); break;
       case 'roster': view.roster = stampAway(event.roster); emit('roster'); break;
       case 'feed': view.feed = [...view.feed.slice(-29), event.item]; emit('feed', event.item); break;
       case 'contam-log': view.contam = event.log; emit('contam'); break;

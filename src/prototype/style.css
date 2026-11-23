@@ -181,3 +181,20 @@ body[data-team=solo] #fs-gate-enter{background:var(--text);color:var(--bg)}
   .s-actions.hud-actions kbd { display:none; }
   .s-map { top:8px; right:8px; }
 }
+/* 게임 종료: 학생 화면을 덮고 TV로 시선을 보낸다 */
+#game-over.game-over{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:24px;border:0;background:#070b12;color:#edf1f6;place-items:center;overflow:auto}
+#game-over[open]{display:grid}#game-over::backdrop{background:#070b12}
+.go-wait,.go-card{width:min(640px,100%);text-align:center}
+.go-kicker{margin:0 0 14px;font-family:var(--sys);font-size:14px;letter-spacing:.14em;color:#8792a3}
+.go-title{margin:0;font-size:clamp(36px,7vw,64px);line-height:1.15;word-break:keep-all}
+.go-note{margin:16px 0 0;font-size:16px;line-height:1.6;color:#aab4c3}
+.go-wait .go-title{animation:go-pulse 1.8s ease-in-out infinite}
+@keyframes go-pulse{50%{opacity:.55}}
+.go-card[data-team=blue] .go-title{color:#5ea8ff}.go-card[data-team=red] .go-title{color:#ff6f61}
+.go-awards{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px}
+.go-award{display:flex;flex-direction:column;gap:3px;min-width:136px;padding:12px 16px;border-radius:8px;background:#f0c65d;color:#2b2205}
+.go-award b{font-size:17px}.go-award span{font-family:var(--sys);font-size:14px}
+.go-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:22px}
+.go-stats div{display:flex;flex-direction:column;gap:4px;padding:12px 8px;border-radius:8px;background:#141a22}
+.go-stats b{font-family:var(--sys);font-size:24px}.go-stats span{font-size:13px;color:#8792a3}
+@media(prefers-reduced-motion:reduce){.go-wait .go-title{animation:none}}

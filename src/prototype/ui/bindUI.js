@@ -62,7 +62,8 @@ export function bindUI(state) {
     },
   });
   const eraScore = era => {
-    const { teams, scores } = state.board;
+    const { teams, scores, sealed } = state.board;
+    if (sealed) return '🔒 집계 중';
     const team = state.me?.team ?? 'blue';
     return teams ? `${scores[era][team]}점 (우리 팀)` : `${scores[era].blue}점`;
   };

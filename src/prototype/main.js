@@ -11,6 +11,7 @@ import { bindTutorial } from './ui/bindTutorial.js';
 import { bindOpening } from './ui/bindOpening.js';
 import { bindShortcuts } from './ui/bindShortcuts.js';
 import { bindFocus } from './ui/bindFocus.js';
+import { bindGameOver } from './ui/bindGameOver.js';
 const training = new URLSearchParams(location.search).has('training');
 const state = new SessionState();
 if (training) {
@@ -24,6 +25,7 @@ const touch = bindTouch();
 if (!training) bindOpening(state, bindTutorial(state));
 bindShortcuts(state);
 if (!training) bindFocus(state);
+if (!training) bindGameOver(state);
 new Phaser.Game({
   type: Phaser.AUTO, parent: 'game', backgroundColor: '#101b25',
   pixelArt: true, roundPixels: true, antialias: false,

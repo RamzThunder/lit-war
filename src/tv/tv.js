@@ -6,17 +6,19 @@ import { ERAS } from '../prototype/minigames/wiring.js';
 import { teamName, teamShort } from '../prototype/teams.js';
 import { eraOwner, isClose, teamTotal, heldCount } from '../shared/eras.js';
 import { createRoom, savedLogin, clock, timeLeft, feedTime, joinUrl, awayList } from '../teacher/room.js';
+import { createResults } from './results.js';
 // View-only classroom TV. Same teacher socket as the console, but no controls.
 // Screens: lobby (waiting / opening), board (playing, paused, ended), raid (live spectate).
 const $ = selector => document.querySelector(selector);
 const room = createRoom();
 const { view } = room;
 let spectator = null, spectatorLoading = null, lastOwners = {}, knownNames = null;
+const resultShow = createResults($('#results'));
 
 for (const el of document.querySelectorAll('.team-name')) el.textContent = teamName(el.dataset.team);
 
 // ---- fit the 1920×1080 stage to any screen ------------------------------------------
-const fit = () => { $('#stage').style.transform = `scale(${Math.min(innerWidth / 1920, innerHeight / 1080)})`; };
+const fit = () => { const scale = Math.min(innerWidth / 1920, innerHeight / 1080); $('#stage').style.transform = `scale(${scale})`; $('#results').style.setProperty('--rs-scale', scale); };
 addEventListener('resize', fit); fit();
 
 // ---- login (only when opened directly; the console passes the login via sessionStorage)
@@ -76,8 +78,25 @@ function renderLobby() {
 
 // ---- board -------------------------------------------------------------------------------
 const PHASE_LABEL = { playing: '진행 중 · 남은 시간', paused: '잠시 멈춤', ended: '게임 종료' };
+const phaseLabel = ({ phase, sealed }) => (sealed ? (phase === 'ended' ? '기록 집계 완료' : phase === 'paused' ? '잠시 멈춤' : '마지막 기록 동기화 중') : PHASE_LABEL[phase] ?? '');
+// The TV shares the teacher socket, so it receives live scores and must mask them here.
+function renderSealed() {
+  for (const id of ['total-blue', 'total-red', 'raid-blue', 'raid-red']) $(`#${id}`).textContent = '?';
+  const online = team => view.roster.filter(p => p.team === team && p.online).length;
+  $('#sub-blue').textContent = `${online('blue')}명 접속`; $('#sub-red').textContent = `${online('red')}명 접속`;
+  for (const bar of [$('#tug'), $('#raid-tug')]) { bar.classList.add('empty'); bar.firstElementChild.style.width = '50%'; }
+  $('#lead').textContent = view.lesson.phase === 'ended' ? '🔒 HUMAN 기록 집계 완료 · 결과 공개 대기' : '🔒 HUMAN 기록 동기화 중 · 점수 비공개';
+  $('#eras').replaceChildren(...ERAS.map(era => {
+    const tile = document.createElement('div'); tile.className = 'era-tile sealed';
+    tile.innerHTML = `<span class="sys yr">${era}</span><span class="owner">집계 중</span>`;
+    return tile;
+  }));
+  $('#paused').hidden = view.lesson.phase !== 'paused';
+  renderFeed(); renderClock();
+}
 function renderBoard() {
   const scores = view.scores; if (!scores || !view.lesson) return;
+  if (view.lesson.sealed) { renderSealed(); return; }
   const total = { blue: teamTotal(scores, ERAS, 'blue'), red: teamTotal(scores, ERAS, 'red') };
   const held = { blue: heldCount(scores, ERAS, 'blue'), red: heldCount(scores, ERAS, 'red') };
   const online = team => view.roster.filter(p => p.team === team && p.online).length;
@@ -88,9 +107,12 @@ function renderBoard() {
   for (const bar of [$('#tug'), $('#raid-tug')]) { bar.classList.toggle('empty', !sum); bar.firstElementChild.style.width = `${sum ? (total.blue / sum) * 100 : 50}%`; }
   $('#raid-blue').textContent = total.blue; $('#raid-red').textContent = total.red;
   const gap = total.blue - total.red, leader = gap > 0 ? 'blue' : gap < 0 ? 'red' : null;
-  const prefix = view.lesson.phase === 'ended' ? '최종 · ' : '';
-  $('#lead').innerHTML = `${prefix}${leader ? `<b class="c-${leader}"></b>` : '<b>동점</b>'} · 점령 ${held.blue} : ${held.red}`;
-  if (leader) $('#lead b').textContent = `${teamShort(leader)} ${view.lesson.phase === 'ended' ? '승리' : '우세'} +${Math.abs(gap)}`;
+  const ended = view.lesson.phase === 'ended';
+  // The final result follows the ending rule: more eras held wins, an equal count is a draw.
+  const winner = held.blue > held.red ? 'blue' : held.red > held.blue ? 'red' : null;
+  const shown = ended ? winner : leader;
+  $('#lead').innerHTML = `${ended ? '최종 · ' : ''}${shown ? `<b class="c-${shown}"></b>` : `<b>${ended ? '접전' : '동점'}</b>`} · 점령 ${held.blue} : ${held.red}`;
+  if (shown) $('#lead b').textContent = ended ? `${teamShort(shown)} 승리` : `${teamShort(shown)} 우세 +${Math.abs(gap)}`;
   // Era tiles; a tile whose owner changed flashes once.
   $('#eras').replaceChildren(...ERAS.map(era => {
     const s = scores[era], owner = eraOwner(s), sum = s.blue + s.red;
@@ -121,7 +143,7 @@ function renderClock() {
   const left = timeLeft(view), phase = view.lesson.phase;
   const text = left == null ? (phase === 'ended' ? '00:00' : '--:--') : clock(left);
   $('#timer').textContent = text; $('#raid-clock').textContent = text;
-  $('#phase-label').textContent = PHASE_LABEL[phase] ?? '';
+  $('#phase-label').textContent = phaseLabel(view.lesson);
   const alert = view.eventEndsAt != null;
   $('#alert').hidden = !alert;
   if (alert) $('#alert-left').textContent = clock(view.eventEndsAt - performance.now()).replace(/^0/, '');
@@ -168,11 +190,35 @@ function renderRaidSide() {
   $('#raid-queue').textContent = waiting.length ? `다음 중계 대기 ${waiting.length}건 · ${waiting.map(r => `${r.attacker.name} → ${r.defender.name}`).join(', ')}` : '';
 }
 
+// ---- ending film -------------------------------------------------------------------------
+// One film per teacher press (`at`). When it finishes the TV asks the server to reveal.
+const film = $('#ending-video');
+let filmAt = null, finishedAt = null;
+function tryPlayFilm() {
+  $('#ending-play').hidden = true;
+  film.play().catch(error => { if (error.name === 'NotAllowedError') $('#ending-play').hidden = false; });
+}
+function renderEnding() {
+  const { ending } = view;
+  if (!ending) { filmAt = null; finishedAt = null; film.pause(); film.removeAttribute('src'); film.load(); $('#ending-film').hidden = true; return; }
+  if (finishedAt === ending.at) { room.send({ type: 'reveal', at: ending.at }); return; }
+  if (filmAt === ending.at) return;
+  filmAt = ending.at;
+  $('#ending-error').hidden = true; $('#ending-film').hidden = false;
+  film.src = `/endings/${ending.film}.mp4`; film.currentTime = 0;
+  tryPlayFilm();
+}
+film.addEventListener('ended', () => { finishedAt = filmAt; room.send({ type: 'reveal', at: filmAt }); });
+film.addEventListener('error', () => { if (filmAt != null) { $('#ending-play').hidden = true; $('#ending-error').hidden = false; } });
+$('#ending-play').addEventListener('click', tryPlayFilm);
+
 // ---- events --------------------------------------------------------------------------
 room.subscribe(async (type, detail) => {
   switch (type) {
     case 'status': $('#conn').textContent = detail.text; break;
-    case 'welcome': lastOwners = {}; knownNames = null; renderAll(); renderAway(); break;
+    case 'welcome': lastOwners = {}; knownNames = null; renderAll(); renderAway(); renderEnding(); resultShow.render(view.results, { animate: false }); break;
+    case 'results': resultShow.render(view.results); break;
+    case 'ending': renderEnding(); break;
     case 'lesson': renderLobby(); renderBoard(); screen(); break;
     case 'scores': case 'contam': renderBoard(); break;
     case 'roster': renderLobby(); renderBoard(); renderAway(); break;

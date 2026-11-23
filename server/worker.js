@@ -11,13 +11,13 @@ export default {
       return env.ROOMS.getByName(match[1]).fetch(request);
     }
     if (url.pathname === '/api/health') return Response.json({ ok: true });
-    if (url.pathname.startsWith('/openings/')) return serveVideo(request, env);
+    if (url.pathname.startsWith('/openings/') || url.pathname.startsWith('/endings/')) return serveVideo(request, env);
     if (url.pathname.startsWith('/api/')) return new Response('Not found', { status: 404 });
     return env.ASSETS.fetch(request);
   },
 };
 // Static assets answer without Range support, but Safari (iPhone/iPad) needs 206 partial
-// responses to play video at all. The opening films are a few MB, so slice them here.
+// responses to play video at all. The opening and ending films are a few MB, so slice them here.
 async function serveVideo(request, env) {
   const asset = await env.ASSETS.fetch(new Request(request.url, { method: 'GET' }));
   const range = request.headers.get('Range')?.match(/^bytes=(\d*)-(\d*)$/);

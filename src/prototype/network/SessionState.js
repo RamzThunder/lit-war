@@ -19,7 +19,7 @@ export class SessionState {
   }
   // Server sends remaining ms; keep a local deadline for the countdown.
   setLesson(lesson, announce) {
-    const previous = this.lesson?.phase, hadEvent = Boolean(this.lesson?.event);
+    const previous = this.lesson?.phase, hadEvent = Boolean(this.lesson?.event), wasSealed = Boolean(this.lesson?.sealed);
     this.lesson = lesson ? { ...lesson, endsAt: lesson.left == null ? null : performance.now() + lesson.left, event: lesson.event ? { endsAt: performance.now() + lesson.event.left } : null } : null;
     if (announce && lesson && Boolean(lesson.event) !== hadEvent) {
       // The start is shown in the alert slot over the game; only announce the end.
@@ -28,15 +28,17 @@ export class SessionState {
     // A fresh opening (first time or the teacher replayed it) must be watched again.
     if (lesson?.opening && lesson.opening.id !== this.openingId) this.openingWatched = false;
     this.openingId = lesson?.opening?.id;
+    if (lesson?.phase !== 'ended') { this.results = null; this.mine = null; }
     this.emit('lesson', this.lesson);
+    if (announce && lesson && previous === 'playing' && lesson.phase === 'playing' && lesson.sealed && !wasSealed) this.notice('🔒 마지막 30초! 점수는 끝나고 공개돼요. 미션은 계속 점수로 들어가요.', 'warn');
     if (!announce || !lesson || previous === lesson.phase) return;
-    const text = { playing: ['▶ 게임 시작! 단말기에서 미션을 시작하세요.', 'good'], paused: ['⏸ 선생님이 게임을 잠시 멈췄어요.', 'warn'], ended: ['■ 게임 끝! 점령 현황을 확인하세요.', 'warn'], lobby: ['선생님이 시작할 때까지 기다려 주세요.', 'info'] }[lesson.phase];
+    const text = { playing: ['▶ 게임 시작! 단말기에서 미션을 시작하세요.', 'good'], paused: ['⏸ 선생님이 게임을 잠시 멈췄어요.', 'warn'], lobby: ['선생님이 시작할 때까지 기다려 주세요.', 'info'] }[lesson.phase];
     if (lesson.phase !== 'playing' && this.remote.terminalOpen) { this.remote.terminalOpen = false; this.remote.round = null; this.publish(); }
     if (text) this.notice(...text);
   }
   get snapshot() { return this.online ? structuredClone(this.remote) : this.local.snapshot; }
   // `gated` = the full-screen gate covers the game (see bindFocus).
-  get inputBlocked() { return (this.online && !this.connected) || Boolean(this.gated); }
+  get inputBlocked() { return (this.online && !this.connected) || Boolean(this.gated) || (this.online && this.lesson?.phase === 'ended'); }
   subscribe(fn) { this.listeners.add(fn); fn(this.snapshot); return () => this.listeners.delete(fn); }
   publish() { for (const fn of this.listeners) fn(this.snapshot); }
   subscribeSession(fn) { this.sessionListeners.add(fn); fn(this); return () => this.sessionListeners.delete(fn); }
@@ -46,7 +48,7 @@ export class SessionState {
   send(message) { if (this.connected && this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message)); }
   // Team points while online; personal progress in solo practice.
   get board() {
-    if (this.online && this.scores) return { teams: true, scores: this.scores };
+    if (this.online && this.scores) return { teams: true, scores: this.scores, sealed: Boolean(this.lesson?.sealed) };
     const { progress } = this.local.snapshot;
     return { teams: false, scores: Object.fromEntries(ERAS.map(era => [era, { blue: progress[era] ?? 0, red: 0 }])) };
   }
@@ -82,6 +84,7 @@ export class SessionState {
           clearTimeout(timeout); this.connected = true; this.retry = 0; this.id = event.id;
           this.players = new Map(event.players.map(player => [player.id, player]));
           this.setRemote(event.state); this.scores = event.scores; this.raid = null;
+          this.results = event.results ?? null; this.mine = event.mine ?? null;
           // The server knows whether this student already finished the current opening.
           this.openingWatched = Boolean(event.openingWatched); this.openingId = event.lesson?.opening?.id;
           this.setLesson(event.lesson, false);
@@ -123,6 +126,7 @@ export class SessionState {
           if (event.result === 'repaired') this.notice('수리 완료! 다시 사용할 수 있어요.', 'good');
           break;
         case 'scores': this.scores = event.scores; break;
+        case 'results': this.results = event.results; this.mine = event.mine; break;
         case 'lesson': this.setLesson(event.lesson, true); break;
         case 'away-back': this.notice(`${event.reason === 'fullscreen' ? '⛶ 전체 화면을 껐어요' : '🚪 게임 화면을 벗어났어요'} (${event.count}번째, ${event.seconds}초) · 선생님 화면과 TV에 표시돼요`, 'warn'); break;
         case 'bait-offer': this.emit('bait-offer', event.offer); break;

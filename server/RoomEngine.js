@@ -1,6 +1,9 @@
 import { GameState, MISSION_POINTS } from '../src/prototype/state/GameState.js';
 import { map, ERAS, validPosition, terminalFor, doorFor, isNearTerminal, isNearDoor } from '../src/prototype/map.js';
 import { wiringRecords, shuffle } from '../src/prototype/minigames/wiring.js';
+import { eraOwner, heldCount } from '../src/shared/eras.js';
+import { buildResults, newStats, personalResult } from './results.js';
+import { clipTrack, newTrack, recordMove, recordShock } from './replay.js';
 export { validPosition };
 export const MAX_PLAYERS = 30;
 export const TEAMS = ['blue', 'red'];
@@ -12,9 +15,11 @@ export const RULES = Object.freeze({
   // Contamination alert: a 1-minute event. Luddites may plant one bait per mission,
   // Guardians cleanse it; both get one try and double points.
   eventMs: 60000, eventAutoBefore: 600000, baitPoints: 20, cleansePoints: 20, maxContam: 3,
+  // Students and the TV stop seeing the score this long before the end; only the teacher sees it.
+  sealScoresMs: 30000,
 });
 const emptyScores = () => Object.fromEntries(ERAS.map(era => [era, { blue: 0, red: 0 }]));
-const newProfile = (name, team) => ({ name, team, sabotageRights: 0, raidRights: 0, trap: null, game: { missions: 0, sabotages: [] } });
+const newProfile = (name, team) => ({ name, team, sabotageRights: 0, raidRights: 0, trap: null, stats: newStats(), game: { missions: 0, sabotages: [] } });
 const BLOCKING = new Set(['barricade', 'broken']);
 const recordOf = (era, id) => wiringRecords[era].find(r => r.id === id);
 // Lesson flow. `free` = no teacher has claimed the room yet, so students play right away.
@@ -23,7 +28,13 @@ const recordOf = (era, id) => wiringRecords[era].find(r => r.id === id);
 // teacher can start once every connected student has finished it.
 export const PHASES = ['free', 'lobby', 'opening', 'playing', 'paused', 'ended'];
 const ACTIVE = new Set(['free', 'playing']);
-const newLesson = () => ({ phase: 'free', endsAt: null, remainMs: null, durationMs: null, keyHash: null, event: null, eventFired: false, opening: null });
+const UNSEALED = Object.freeze({ sealed: false, sealedScores: null, ending: null, results: null, awardTokens: null });
+const newLesson = () => ({ phase: 'free', endsAt: null, remainMs: null, durationMs: null, keyHash: null, event: null, eventFired: false, opening: null, highlight: null, replay: null, ...UNSEALED });
+// The team holding more eras wins; an equal count (including 0:0) is the draw ending.
+export const endingFilm = scores => {
+  const blue = heldCount(scores, ERAS, 'blue'), red = heldCount(scores, ERAS, 'red');
+  return blue > red ? 'guardian' : red > blue ? 'luddite' : 'draw';
+};
 const PHASE_BLOCKED = { lobby: '선생님이 게임을 시작하면 할 수 있어요.', opening: '영상과 튜토리얼이 끝나면 선생님이 게임을 시작해요.', paused: '선생님이 게임을 잠시 멈췄어요.', ended: '게임이 끝났어요.' };
 // Room authority. Students roam their own copy of the map without sending positions; the
 // server judges missions, awards team points and attack rights, and relays movement only
@@ -36,6 +47,7 @@ export class RoomEngine {
     this.teachers = new Map(); this.feedLog = []; this.contamLog = [];
     this.profiles = new Map(profiles ?? []);
     this.sessions = new Map(); this.raids = new Map((raids ?? []).map(raid => [raid.id, raid]));
+    this.raidTracks = new Map();
     this.random = random; this.dirty = new Set(); this.scoresDirty = false; this.raidsDirty = false;
   }
   // ---- sessions ------------------------------------------------------------------------
@@ -77,8 +89,8 @@ export class RoomEngine {
   }
   isTeacher(id) { return this.teachers.has(id); }
   lessonView(now = Date.now()) {
-    const { phase, endsAt, remainMs, durationMs, event } = this.lesson;
-    return { phase, durationMs, left: phase === 'playing' ? Math.max(0, endsAt - now) : phase === 'paused' ? remainMs : null, event: event ? { left: Math.max(0, event.endsAt - now) } : null, opening: phase === 'opening' ? this.openingProgress() : null };
+    const { phase, endsAt, remainMs, durationMs, event, sealed } = this.lesson;
+    return { phase, ...(sealed ? { sealed: true } : {}), durationMs, left: phase === 'playing' ? Math.max(0, endsAt - now) : phase === 'paused' ? remainMs : null, event: event ? { left: Math.max(0, event.endsAt - now) } : null, opening: phase === 'opening' ? this.openingProgress() : null };
   }
   // Opening progress counts only students connected right now; finished ones are kept by token
   // so a reload does not make them watch again.
@@ -108,7 +120,7 @@ export class RoomEngine {
     });
   }
   teacherWelcome(now = Date.now()) {
-    return { type: 'teacher-welcome', lesson: this.lessonView(now), scores: this.scores, roster: this.roster(), feed: this.feedLog, contam: this.contamLog, raids: [...this.raids.keys()].map(id => this.watchView(id, now)).filter(Boolean) };
+    return { type: 'teacher-welcome', lesson: this.lessonView(now), scores: this.scores, ending: this.lesson.ending ?? null, results: this.#teacherResults(), roster: this.roster(), feed: this.feedLog, contam: this.contamLog, raids: [...this.raids.keys()].map(id => this.watchView(id, now)).filter(Boolean) };
   }
   // Spectator snapshot of a live raid for teachers: both players, the defender's room
   // sabotages (the map the raid happens in), timer and shocks.
@@ -127,6 +139,56 @@ export class RoomEngine {
     return this.#toTeachers({ type: 'feed', item });
   }
   #lessonMessage(now) { return { to: '*', data: { type: 'lesson', lesson: this.lessonView(now) } }; }
+  // While sealed, live scores go to teacher sockets only.
+  #scoresOut() {
+    const data = { type: 'scores', scores: this.scores };
+    return this.lesson.sealed ? this.#toTeachers(data) : [{ to: '*', data }];
+  }
+  // ---- end-of-game records -----------------------------------------------------------------
+  #stat(token, key, amount = 1) {
+    const profile = this.profiles.get(token); if (!profile) return;
+    profile.stats = { ...newStats(), ...profile.stats };
+    profile.stats[key] += amount; this.dirty.add(token);
+  }
+  // Keeps the single most dramatic play; a later play wins an equal weight.
+  #moment(weight, kind, text, team, flip = null) {
+    if (this.lesson.highlight && this.lesson.highlight.weight > weight) return;
+    this.lesson.highlight = { weight, kind, text, team, flip }; this.lessonDirty = true;
+  }
+  // Taking an era from the other team during the hidden last 30 seconds is the top moment.
+  #noteFlip(s, era, before, now) {
+    const team = s.profile.team;
+    if (!this.lesson.sealed || before === team || before === 'empty' || eraOwner(this.scores[era]) !== team) return;
+    const seconds = Math.max(1, Math.ceil((this.lesson.endsAt - now) / 1000));
+    this.#moment(90, 'flip', `종료 ${seconds}초 전, ${s.name}이(가) ${era}년대를 뒤집었어요!`, team, { name: s.name, era, seconds });
+  }
+  // The replay is only drawn on the TV, so it stays off student sockets.
+  #teacherResults() {
+    const { results, replay } = this.lesson;
+    if (!results) return null;
+    if (!replay) return results;
+    const { weight, ...clip } = replay;
+    return { ...results, replay: clip };
+  }
+  #keepReplay(raidId, endedAt, weight) {
+    const track = this.raidTracks.get(raidId);
+    this.raidTracks.delete(raidId);
+    if (!track || weight == null || (this.lesson.replay && this.lesson.replay.weight > weight)) return;
+    this.lesson.replay = clipTrack(track, endedAt, weight); this.lessonDirty = true;
+  }
+  #reveal(now) {
+    const { results, awardTokens } = buildResults({ scores: this.scores, eras: ERAS, profiles: this.profiles, contam: this.contamLog, highlight: this.lesson.highlight, film: this.lesson.ending?.film ?? endingFilm(this.scores), at: now });
+    Object.assign(this.lesson, UNSEALED, { results, awardTokens }); this.lessonDirty = true;
+    const personal = [...this.sessions].map(([to, s]) => ({ to, data: { type: 'results', results, mine: personalResult(results, awardTokens, s.profile, s.token) } }));
+    return [this.#lessonMessage(now), ...this.#scoresOut(), ...this.#endingOut(), ...this.#toTeachers({ type: 'results', results: this.#teacherResults() }), ...personal, ...this.#feed('📊 최종 결과 공개', 'lesson', now)];
+  }
+  #endingOut() { return this.#toTeachers({ type: 'ending', ending: this.lesson.ending ?? null }); }
+  #sealScores() {
+    if (this.lesson.sealed) return false;
+    Object.assign(this.lesson, { sealed: true, sealedScores: structuredClone(this.scores) });
+    this.lessonDirty = true;
+    return true;
+  }
   // Pausing/ending closes every terminal and stops live raids so nobody keeps scoring.
   #halt(now, reason) {
     const out = this.lesson.event ? this.#endEvent(now) : [];
@@ -138,6 +200,7 @@ export class RoomEngine {
     return out;
   }
   #setPhase(phase, now, patch = {}) {
+    if (phase === 'ended') this.#sealScores();
     Object.assign(this.lesson, { phase, ...patch }); this.lessonDirty = true;
     // Away warnings only matter while students should be watching or playing.
     if (phase === 'lobby' || phase === 'ended') for (const s of this.sessions.values()) s.away = null;
@@ -146,13 +209,15 @@ export class RoomEngine {
   }
   #reset(now) {
     const out = this.#halt(now, '선생님이 게임을 초기화했어요.');
+    Object.assign(this.lesson, UNSEALED, { highlight: null, replay: null });
+    this.raidTracks.clear();
     this.scores = emptyScores(); this.scoresDirty = true;
-    for (const [token, p] of this.profiles) { Object.assign(p, { sabotageRights: 0, raidRights: 0, trap: null, awayCount: 0, game: { missions: 0, sabotages: [] } }); this.dirty.add(token); }
+    for (const [token, p] of this.profiles) { Object.assign(p, { sabotageRights: 0, raidRights: 0, trap: null, awayCount: 0, stats: newStats(), game: { missions: 0, sabotages: [] } }); this.dirty.add(token); }
     for (const s of this.sessions.values()) s.away = null;
     this.contamLog = []; out.push(...this.#toTeachers({ type: 'contam-log', log: this.contamLog }));
     for (const [id, s] of this.sessions) { s.game = new GameState(s.profile.game, this.random); out.push(this.stateMessage(id, now)); }
     this.feedLog = [];
-    out.push({ to: '*', data: { type: 'scores', scores: this.scores } });
+    out.push(...this.#scoresOut(), ...this.#endingOut(), ...this.#toTeachers({ type: 'results', results: null }));
     for (const id of this.sessions.keys()) out.push({ to: id, data: { type: 'me', me: this.me(id) } });
     return [...out, ...this.#setPhase('lobby', now, { endsAt: null, remainMs: null, opening: null }), ...this.teacherUpdate()];
   }
@@ -169,7 +234,7 @@ export class RoomEngine {
       case 'opening':
         if (phase === 'playing' || phase === 'paused') return error('게임 중에는 오프닝을 틀 수 없어요.');
         for (const s of this.sessions.values()) s.opening = null;
-        return [...this.#setPhase('opening', now, { endsAt: null, remainMs: null, opening: { done: [], at: now } }), ...this.teacherUpdate()];
+        return [...this.#setPhase('opening', now, { endsAt: null, remainMs: null, opening: { done: [], at: now }, ...UNSEALED }), ...this.#scoresOut(), ...this.#endingOut(), ...this.#toTeachers({ type: 'results', results: null }), ...this.teacherUpdate()];
       case 'start': {
         if (phase === 'playing' || phase === 'paused') return error('이미 진행 중이에요.');
         if (phase === 'opening' && !this.openingProgress().ready && !message.force) {
@@ -179,7 +244,7 @@ export class RoomEngine {
         const minutes = Math.round(Number(message.minutes));
         if (!Number.isFinite(minutes) || minutes < 1 || minutes > 90) return error('시간은 1~90분 사이로 정하세요.');
         const durationMs = minutes * 60000;
-        return this.#setPhase('playing', now, { durationMs, endsAt: now + durationMs, remainMs: null, event: null, eventFired: false, opening: null });
+        return [...this.#setPhase('playing', now, { durationMs, endsAt: now + durationMs, remainMs: null, event: null, eventFired: false, opening: null, ...UNSEALED }), ...this.#scoresOut(), ...this.#endingOut(), ...this.#toTeachers({ type: 'results', results: null })];
       }
       case 'pause':
         if (phase !== 'playing') return error('진행 중일 때만 멈출 수 있어요.');
@@ -190,6 +255,18 @@ export class RoomEngine {
       case 'end':
         if (phase !== 'playing' && phase !== 'paused') return error('진행 중인 게임이 없어요.');
         return [...this.#halt(now, '게임이 끝났어요.'), ...this.#setPhase('ended', now, { endsAt: null, remainMs: null })];
+      case 'ending': {
+        if (phase !== 'ended') return error('게임이 끝난 뒤에 엔딩을 틀 수 있어요.');
+        if (!this.lesson.sealed) return error('이미 결과를 공개했어요.');
+        this.lesson.ending = { film: endingFilm(this.scores), at: now }; this.lessonDirty = true;
+        return [...this.#endingOut(), ...this.#feed('🎬 엔딩 재생', 'lesson', now)];
+      }
+      case 'reveal': {
+        // The TV passes the ending it finished, so a stale player cannot reveal a replay early.
+        if (phase !== 'ended' || !this.lesson.sealed) return [];
+        if (message.at != null && message.at !== this.lesson.ending?.at) return [];
+        return this.#reveal(now);
+      }
       case 'reset': return this.#reset(now);
       case 'kick': {
         const target = [...this.sessions.values()].find(s => s.name === message.name);
@@ -261,9 +338,11 @@ export class RoomEngine {
     if (live) { live.game.prune(now); live.game.addSabotage(contam); this.#persist(live); }
     else { target.game.sabotages = [...this.#activeFor(token, now), contam]; this.dirty.add(token); }
     this.scores[bait.era][s.profile.team] += RULES.baitPoints; this.scoresDirty = true;
+    this.#stat(s.token, 'baits'); this.#stat(s.token, 'points', RULES.baitPoints);
+    this.#moment(30, 'bait', `${s.name}이(가) 「${truth.title}」에 가짜 기록을 심었어요`, s.profile.team);
     const out = [
       ...reply({ type: 'bait-result', ok: true, name: target.name, truth, fake, message: `미끼 성공! ${target.name}의 방에 심었어요 (+${RULES.baitPoints})` }),
-      { to: '*', data: { type: 'scores', scores: this.scores } },
+      ...this.#scoresOut(),
       ...this.#feed(`🧪 ${s.name} → ${target.name}의 방에 미끼 (「${truth.title}」 ${bait.field === 'era' ? '시대' : '작가'} 변조)`, 'red', now),
       ...this.#logContam({ id, era: bait.era, by: s.name, target: target.name, title: truth.title, field: bait.field, fake: message.value, truth: bait.truth, status: 'planted' }),
     ];
@@ -279,10 +358,14 @@ export class RoomEngine {
     const correct = message.value === contam.truth;
     const record = wiringRecords[contam.trueEra].find(r => r.title === contam.card.title);
     const truth = { title: record.title, author: record.author, era: contam.trueEra };
-    if (correct) { this.scores[contam.trueEra][s.profile.team] += RULES.cleansePoints; this.scoresDirty = true; }
+    if (correct) {
+      this.scores[contam.trueEra][s.profile.team] += RULES.cleansePoints; this.scoresDirty = true;
+      this.#stat(s.token, 'cleansed'); this.#stat(s.token, 'points', RULES.cleansePoints);
+      this.#moment(30, 'cleanse', `${s.name}이(가) 가짜 기록을 찾아 「${truth.title}」을(를) 되살렸어요`, s.profile.team);
+    }
     return [
       { to: s.id, data: { type: 'cleanse-result', correct, truth, field: contam.field, points: correct ? RULES.cleansePoints : 0, state: this.state(s.id, now) } },
-      ...(correct ? [{ to: '*', data: { type: 'scores', scores: this.scores } }] : []),
+      ...(correct ? this.#scoresOut() : []),
       ...this.#feed(correct ? `✨ ${s.name}이(가) 「${truth.title}」 오염을 정화했어요` : `${s.name}의 정화 실패 — 「${truth.title}」 정답 공개`, s.profile.team, now),
       ...this.#updateContam(contam.id, correct ? 'fixed' : 'missed'),
     ];
@@ -329,7 +412,7 @@ export class RoomEngine {
   }
   stateMessage(id, now, extra = {}) { return { to: id, data: { type: 'state', state: this.state(id, now), me: this.me(id), ...extra } }; }
   welcome(id, now = Date.now()) {
-    return { type: 'welcome', id, me: this.me(id), players: this.players(), state: this.state(id, now), scores: this.scores, lesson: this.lessonView(now), openingWatched: this.openingWatched(this.sessions.get(id)?.token) };
+    return { type: 'welcome', id, me: this.me(id), players: this.players(), state: this.state(id, now), scores: this.lesson.sealed ? this.lesson.sealedScores : this.scores, results: this.lesson.results ?? null, mine: personalResult(this.lesson.results, this.lesson.awardTokens, this.sessions.get(id)?.profile, this.sessions.get(id)?.token), lesson: this.lessonView(now), openingWatched: this.openingWatched(this.sessions.get(id)?.token) };
   }
   remove(id, now = Date.now()) {
     if (this.teachers.delete(id)) return [];
@@ -377,12 +460,13 @@ export class RoomEngine {
     for (const raid of [...this.raids.values()]) if (now >= raid.endsAt) out.push(...this.#endRaid(raid.id, now));
     if (this.lesson.event && now >= this.lesson.event.endsAt) out.push(...this.#endEvent(now));
     if (this.lesson.phase === 'playing' && !this.lesson.eventFired && now >= this.#eventAutoAt() && now < this.lesson.endsAt) out.push(...this.#startEvent(now));
+    if (this.lesson.phase === 'playing' && now >= this.lesson.endsAt - RULES.sealScoresMs && now < this.lesson.endsAt && this.#sealScores()) out.push(this.#lessonMessage(now), ...this.#feed('🔒 마지막 30초 · 학생과 TV의 점수를 가렸어요', 'lesson', now));
     if (this.lesson.phase === 'playing' && now >= this.lesson.endsAt) out.push(...this.#halt(now, '시간이 다 됐어요!'), ...this.#setPhase('ended', now, { endsAt: null, remainMs: null }));
     return out;
   }
   nextDeadline() {
     const playing = this.lesson.phase === 'playing';
-    const lessonEnd = playing ? [this.lesson.endsAt, ...(this.lesson.eventFired ? [] : [this.#eventAutoAt()]), ...(this.lesson.event ? [this.lesson.event.endsAt] : [])] : [];
+    const lessonEnd = playing ? [this.lesson.endsAt, ...(this.lesson.sealed ? [] : [this.lesson.endsAt - RULES.sealScoresMs]), ...(this.lesson.eventFired ? [] : [this.#eventAutoAt()]), ...(this.lesson.event ? [this.lesson.event.endsAt] : [])] : [];
     return Math.min(Infinity, ...lessonEnd, ...[...this.raids.values()].map(r => r.endsAt));
   }
   // ---- commands --------------------------------------------------------------------------
@@ -419,7 +503,7 @@ export class RoomEngine {
         if (!s.game.openRepair(kind, message.era, now, this.random)) return [this.stateMessage(id, now)];
         break;
       }
-      case 'pick': result = s.game.pickRepair(message.id, now); if (result === 'repaired') this.#persist(s); break;
+      case 'pick': result = s.game.pickRepair(message.id, now); if (result === 'repaired') { this.#persist(s); this.#stat(s.token, 'repairs'); } break;
       case 'close': s.game.closeTerminal(); break;
       // Mission selection is random. A client cannot change the issued round.
       case 'next': s.game.nextRound(); break;
@@ -448,12 +532,16 @@ export class RoomEngine {
   }
   #award(s, now) {
     const { round, missions } = s.game.snapshot;
+    const before = eraOwner(this.scores[round.era]);
     this.scores[round.era][s.profile.team] += MISSION_POINTS; this.scoresDirty = true;
+    this.#stat(s.token, 'points', MISSION_POINTS);
+    if (this.lesson.sealed) this.#stat(s.token, 'clutch');
+    this.#noteFlip(s, round.era, before, now);
     let right = null;
     if (missions % RULES.sabotageEvery === 0) { s.profile.sabotageRights++; right = 'sabotage'; }
     if (missions % RULES.raidEvery === 0) { s.profile.raidRights++; right = 'raid'; }
     this.#persist(s);
-    const out = [{ to: '*', data: { type: 'scores', scores: this.scores } }, ...this.teacherUpdate()];
+    const out = [...this.#scoresOut(), ...this.teacherUpdate()];
     if (right) out.push({ to: s.id, data: { type: 'right', right, me: this.me(s.id) } }, ...this.#feed(`${s.name} ${right === 'raid' ? '⚡ 공격권' : '🛠 방해 권한'} 획득`, s.profile.team, now));
     return out;
   }
@@ -476,6 +564,8 @@ export class RoomEngine {
     const raid = { id: `${now}-${s.id}`, attacker: s.id, defender: target.id, endsAt: now + RULES.raidMs, shocks: 0, stolen: 0, cooldownUntil: 0, stunUntil: 0, invulnUntil: 0 };
     this.raids.set(raid.id, raid); this.raidsDirty = true;
     s.raid = target.raid = raid.id;
+    const actor = x => ({ name: x.name, team: x.profile.team });
+    this.raidTracks.set(raid.id, newTrack({ attacker: actor(s), defender: actor(target), room: this.view(target.game.activeSabotages(now), now), entry: map.entry, now }));
     s.game.closeTerminal(); target.game.closeTerminal();
     s.player = { ...map.entry, direction: 'up', moving: false }; s.lastMove = now;
     target.player = null; // learned from the defender's first raid move
@@ -504,6 +594,8 @@ export class RoomEngine {
       for (let step = 1; step <= steps; step++) if (!validPosition(s.player.x + (x - s.player.x) * step / steps, s.player.y + (y - s.player.y) * step / steps, extra)) return correction();
     }
     s.player = { x, y, direction, moving }; s.lastMove = now;
+    const track = this.raidTracks.get(raid.id);
+    if (track) recordMove(track, s.id === raid.attacker ? 'attacker' : 'defender', now, s.player);
     const partner = this.#partner(s);
     const watch = this.#toTeachers({ type: 'watch-move', id: raid.id, role: s.id === raid.attacker ? 'attacker' : 'defender', player: s.player });
     return [...(partner ? [{ to: partner.id, data: { type: 'peer', player: { id: s.id, ...s.player } } }] : []), ...watch];
@@ -525,14 +617,32 @@ export class RoomEngine {
     const def = defender.profile.team, att = s.profile.team;
     const era = ERAS.reduce((best, e) => (this.scores[e][def] > this.scores[best][def] ? e : best), ERAS[0]);
     const stolen = Math.min(RULES.steal, this.scores[era][def]);
+    const before = eraOwner(this.scores[era]);
     this.scores[era][def] -= stolen; this.scores[era][att] += stolen; raid.stolen += stolen; this.scoresDirty = true;
+    this.#stat(s.token, 'shocks'); this.#stat(s.token, 'stolen', stolen); this.#stat(defender.token, 'lost', stolen);
+    this.#noteFlip(s, era, before, now);
+    const track = this.raidTracks.get(raid.id);
+    if (track) recordShock(track, now, stolen, defender.player);
     const data = { type: 'shock', shocks: raid.shocks, maxShocks: RULES.maxShocks, stunMs: RULES.stunMs, recoveryMs: RULES.recoveryMs, invulnMs: RULES.invulnMs, stolen, era, defender: { id: defender.id, ...defender.player } };
-    return [{ to: s.id, data }, { to: defender.id, data }, ...this.#toTeachers({ type: 'watch-shock', id: raid.id, shocks: raid.shocks, stolen, totalStolen: raid.stolen, era, stunMs: RULES.stunMs, defender: defender.player }), { to: '*', data: { type: 'scores', scores: this.scores } }, ...this.#feed(`⚡ ${s.name}이(가) ${defender.name} 감전${stolen ? ` · ${era}년대 ${stolen}점 탈취` : ''}`, att, now)];
+    return [{ to: s.id, data }, { to: defender.id, data }, ...this.#toTeachers({ type: 'watch-shock', id: raid.id, shocks: raid.shocks, stolen, totalStolen: raid.stolen, era, stunMs: RULES.stunMs, defender: defender.player }), ...this.#scoresOut(), ...this.#feed(`⚡ ${s.name}이(가) ${defender.name} 감전${stolen ? ` · ${era}년대 ${stolen}점 탈취` : ''}`, att, now)];
   }
   #endRaid(raidId, now, reason) {
     const raid = this.raids.get(raidId);
     if (!raid) return [];
     this.raids.delete(raidId); this.raidsDirty = true;
+    const attacker = this.sessions.get(raid.attacker), defender = this.sessions.get(raid.defender);
+    let weight = null;
+    if (attacker && defender) {
+      if (raid.shocks) {
+        weight = 20 + raid.stolen * 2 + (raid.shocks >= RULES.maxShocks ? 15 : 0);
+        this.#moment(weight, 'raid', `${attacker.name}이(가) ${defender.name}을(를) ${raid.shocks}번 감전시켜 ${raid.stolen}점을 빼앗았어요`, attacker.profile.team);
+      } else if (!reason) {
+        weight = 35;
+        this.#stat(defender.token, 'escapes');
+        this.#moment(weight, 'escape', `${defender.name}이(가) ${attacker.name}의 15초 추격을 한 번도 안 맞고 따돌렸어요`, defender.profile.team);
+      }
+    }
+    this.#keepReplay(raidId, Math.min(now, raid.endsAt), weight);
     const out = [];
     for (const id of [raid.attacker, raid.defender]) {
       const s = this.sessions.get(id);
@@ -576,11 +686,14 @@ export class RoomEngine {
     const out = [{ to: s.id, data: { type: 'sabotage-done', trapped: true, name: owner.name, kind: 'broken', era, me: this.me(s.id) } }];
     if (live) out.push({ to: live.id, data: { type: 'trap-sprung', by: s.name, era, me: this.me(live.id) } });
     if (live && !live.raid && !s.raid) return [...out, ...this.#feed(`🪤 ${s.name}이(가) ${owner.name}의 함정에 걸렸어요!`, 'blue', now), ...this.#beginRaid(live, s, now, true)];
+    this.#stat(token, 'traps');
+    this.#moment(55, 'trap', `${owner.name}의 함정에 ${s.name}이(가) 걸려들었어요`, owner.team);
     const def = s.profile.team, att = owner.team;
     const best = ERAS.reduce((b, e) => (this.scores[e][def] > this.scores[b][def] ? e : b), ERAS[0]);
     const stolen = Math.min(RULES.trapSteal, this.scores[best][def]);
     this.scores[best][def] -= stolen; this.scores[best][att] += stolen; this.scoresDirty = true;
-    return [...out, { to: s.id, data: { type: 'trap-penalty', stolen, era: best } }, { to: '*', data: { type: 'scores', scores: this.scores } }, ...this.#feed(`🪤 ${s.name}이(가) ${owner.name}의 함정에 걸려 ${stolen}점을 빼앗겼어요`, 'blue', now)];
+    this.#stat(token, 'stolen', stolen); this.#stat(s.token, 'lost', stolen);
+    return [...out, { to: s.id, data: { type: 'trap-penalty', stolen, era: best } }, ...this.#scoresOut(), ...this.#feed(`🪤 ${s.name}이(가) ${owner.name}의 함정에 걸려 ${stolen}점을 빼앗겼어요`, 'blue', now)];
   }
   #liveSession(token) { return [...this.sessions.values()].find(x => x.token === token); }
   #activeFor(token, now) {
@@ -600,6 +713,7 @@ export class RoomEngine {
     const sabotage = { kind, era, by: s.name, until: kind === 'barricade' ? now + RULES.barricadeMs : null };
     const token = s.pending; s.pending = null;
     s.profile.sabotageRights--; this.dirty.add(s.token);
+    this.#stat(s.token, 'sabotages');
     const target = this.profiles.get(token); const live = this.#liveSession(token);
     if (kind === 'broken' && target.trap === era) return this.#springTrap(s, token, era, now);
     const out = [{ to: s.id, data: { type: 'sabotage-done', name: target.name, kind, era, me: this.me(s.id) } }, ...this.#feed(`${kind === 'broken' ? '💥' : '🚧'} ${s.name} → ${target.name}의 ${era}년대 ${kind === 'broken' ? '단말기 고장' : '바리케이드'}`, s.profile.team, now)];

@@ -78,6 +78,12 @@
       <div id="away-bar" class="away-bar" role="alert" hidden><b>🚨 수업 이탈</b><span id="away-names"></span></div>
     </div>
   </div>
+  <div id="results" class="results" hidden></div>
+  <div id="ending-film" class="ending-film" hidden>
+    <video id="ending-video" playsinline preload="auto"></video>
+    <button id="ending-play" type="button" hidden>▶ 화면을 눌러 엔딩 재생</button>
+    <p id="ending-error" hidden>엔딩 영상을 불러오지 못했어요. 교사 화면에서 결과 바로 공개를 눌러 주세요.</p>
+  </div>
   <p id="conn" class="conn" hidden></p>
   <script type="module" src="/src/tv/tv.js"></script>
 </body>

@@ -23,7 +23,19 @@ export function bindHud(state) {
   // yellow ring for a close match (<=10 points). Solo practice shows personal points instead.
   let recommended = null;
   const renderBoard = () => {
-    const { teams, scores } = state.board;
+    const { teams, scores, sealed } = state.board;
+    if (sealed) {
+      $('#board-title').textContent = '🔒 점수 비공개';
+      $('#board-total').innerHTML = '<b class="c-blue">?</b> : <b class="c-red">?</b>';
+      $('#board-rows').replaceChildren(...ERAS.map(era => {
+        const cell = document.createElement('span');
+        cell.className = `s-cell empty${era === recommended ? ' recommended' : ''}`;
+        cell.textContent = era.slice(2);
+        cell.title = `${eraLabel(era)} · 결과는 교실 TV에서 공개돼요`;
+        return cell;
+      }));
+      return;
+    }
     $('#board-title').textContent = teams ? '점령 현황' : '내 복원 점수';
     const total = team => ERAS.reduce((sum, era) => sum + scores[era][team], 0);
     $('#board-total').innerHTML = teams ? `<b class="c-blue">${total('blue')}</b> : <b class="c-red">${total('red')}</b>` : `<b>${total('blue')}점</b>`;

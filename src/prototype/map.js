@@ -22,6 +22,8 @@ export const map={
 export const DOOR_RANGE=52;
 export const terminalFor=era=>map.terminals.find(t=>t.era===era);
 export const doorFor=era=>map.doors.find(d=>d.era===era);
+// Walkable path from the central hall through the room's door to the spot below its terminal.
+export const terminalRoute=era=>{const t=terminalFor(era),d=doorFor(era),y=d.y+d.height/2,door=d.x+d.width/2,inside=door+(t.x<WIDTH/2?-26:26),stand={x:t.x,y:t.y+30};return[{x:WIDTH/2,y},{x:door,y},{x:inside,y},{x:inside,y:stand.y},stand];};
 export const terminalSolid=t=>({x:t.x-32,y:t.y-18,width:t.width,height:t.height});
 export const solids=[...map.walls,...map.racks,...map.crates,...map.terminals.map(terminalSolid)];
 export function movementVector(left,right,up,down,speed=130){const x=Number(right)-Number(left),y=Number(down)-Number(up),length=Math.hypot(x,y)||1;return{x:x/length*speed,y:y/length*speed};}

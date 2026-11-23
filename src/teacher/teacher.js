@@ -14,6 +14,7 @@ if (params.has('tv')) location.replace(`/tv.html${params.get('room') ? `?room=${
 const room = createRoom();
 const { view } = room;
 const PHASE_LABEL = { free: '자유 진행', lobby: '시작 대기', opening: '오프닝 상영', playing: '진행 중', paused: '잠시 멈춤', ended: '종료' };
+const ENDING_NAME = { guardian: '보존관 승리', luddite: '러다이트 승리', draw: '접전' };
 let spectator = null, spectatorLoading = null, menuTarget = null;
 for (const el of document.querySelectorAll('.team-name')) el.textContent = teamName(el.dataset.team);
 
@@ -50,6 +51,12 @@ function renderLesson() {
   $('#resume').hidden = phase !== 'paused';
   $('#event').hidden = phase !== 'playing'; $('#event').disabled = Boolean(view.lesson.event);
   $('#end').hidden = idle;
+  const awaiting = phase === 'ended' && view.lesson.sealed;
+  $('#ending').hidden = !awaiting; $('#reveal').hidden = !awaiting;
+  $('#ending').textContent = view.ending ? '🎬 엔딩 처음부터 다시' : '🎬 엔딩 재생';
+  const seal = $('#seal-chip');
+  seal.hidden = !view.lesson.sealed;
+  seal.textContent = view.ending ? `🎬 TV에서 ${ENDING_NAME[view.ending.film]} 엔딩 재생 중` : awaiting ? '🔒 TV와 학생에게 결과를 가려 뒀어요' : '🔒 마지막 30초 · 점수는 교사에게만 보여요';
   const chip = $('#opening-chip');
   chip.hidden = !opening;
   if (opening) {
@@ -235,6 +242,7 @@ room.subscribe(async (type, detail) => {
       break;
     case 'lesson': renderLesson(); break;
     case 'scores': renderScores(); break;
+    case 'ending': renderLesson(); break;
     case 'roster': renderRoster(); renderScores(); if (view.lesson?.phase === 'opening') renderLesson(); break;
     case 'feed': renderFeed(); break;
     case 'contam': renderContam(); break;
@@ -264,6 +272,8 @@ $('#force-start').addEventListener('click', () => { if (confirm('아직 영상�
 $('#pause').addEventListener('click', () => room.send({ type: 'pause' }));
 $('#resume').addEventListener('click', () => room.send({ type: 'resume' }));
 $('#end').addEventListener('click', () => { if (confirm('게임을 끝낼까요? 남은 시간이 사라집니다.')) room.send({ type: 'end' }); });
+$('#ending').addEventListener('click', () => { if (!room.send({ type: 'ending' })) flash('서버와 연결이 끊겨 있어요. 잠시 후 다시 눌러 주세요.'); });
+$('#reveal').addEventListener('click', () => { if (confirm('엔딩을 건너뛰고 TV와 학생에게 최종 결과를 공개할까요?')) room.send({ type: 'reveal' }); });
 $('#event').addEventListener('click', () => { if (confirm('지금 1분 오염 경보를 발동할까요?')) room.send({ type: 'event' }); });
 $('#reset').addEventListener('click', () => { if (confirm('모든 점수와 학생 미션 기록을 0으로 되돌릴까요? 팀 배정은 유지됩니다.')) room.send({ type: 'reset' }); });
 $('#join-form').addEventListener('submit', event => {

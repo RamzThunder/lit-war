@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RoomEngine, RULES } from '../server/RoomEngine.js';
-import { map, terminalFor, doorFor, validPosition, isNearTerminal } from '../src/prototype/map.js';
+import { RoomEngine, RULES, endingFilm } from '../server/RoomEngine.js';
+import { map, terminalFor, terminalRoute, doorFor, validPosition, isNearTerminal } from '../src/prototype/map.js';
 import { wiringRecords } from '../src/prototype/minigames/wiring.js';
 import { repairAnswer } from '../src/prototype/minigames/repair.js';
 import { createMissionRound } from '../src/prototype/minigames/missionTypes.js';
@@ -399,4 +399,158 @@ test('contamination alert: luddite bait (one try) lands in a guardian room, guar
   // The alert ends by itself after a minute; no more offers.
   assert.equal(room.tick(1000 + RULES.eventMs).filter(o => o.data.type === 'lesson').at(-1).data.lesson.event, null);
   assert.equal(data(mission(room, 'b', '1920', 70000), 'bait-offer', 'b'), undefined);
+});
+
+const lessonRoom = () => {
+  const room = setup();
+  room.joinTeacher('t', 'hash', 0);
+  room.command('t', { type: 'start', minutes: 1 }, 1000);
+  room.lesson.eventFired = true;  // Keep the automatic alert out of these timing checks.
+  return room;
+};
+const scoreTargets = out => out.filter(o => o.data.type === 'scores').map(o => o.to);
+
+test('the last 30 seconds hide live scores from students but not the teacher', () => {
+  const room = lessonRoom();
+  const endsAt = room.lesson.endsAt;
+  assert.equal(room.nextDeadline() <= endsAt - RULES.sealScoresMs, true);
+  assert.equal(room.tick(endsAt - RULES.sealScoresMs - 1).length, 0);
+  const sealed = room.tick(endsAt - RULES.sealScoresMs);
+  assert.equal(data(sealed, 'lesson').lesson.sealed, true);
+  const frozen = structuredClone(room.scores);
+  const out = mission(room, 'a', '1920', endsAt - 20000);
+  assert.deepEqual(scoreTargets(out), ['t']);
+  assert.notDeepEqual(room.scores, frozen);
+  assert.deepEqual(room.welcome('b', endsAt - 10000).scores, frozen);
+  assert.deepEqual(room.teacherWelcome(endsAt - 10000).scores, room.scores);
+});
+
+test('ending plays only after the game and reveals the final score to everyone', () => {
+  const room = lessonRoom();
+  assert.equal(data(room.command('t', { type: 'ending' }, 2000), 'error').message, '게임이 끝난 뒤에 엔딩을 틀 수 있어요.');
+  room.scores['1920'].blue = 10;
+  room.command('t', { type: 'end' }, 3000);
+  assert.equal(room.lesson.sealed, true);
+  const started = data(room.command('t', { type: 'ending' }, 4000), 'ending', 't').ending;
+  assert.deepEqual(started, { film: 'guardian', at: 4000 });
+  assert.equal(room.command('a', { type: 'ending' }, 4100).some(o => o.data.type === 'ending'), false);
+  assert.deepEqual(room.command('t', { type: 'reveal', at: 1 }, 5000), []);
+  const revealed = room.command('t', { type: 'reveal', at: 4000 }, 5000);
+  assert.deepEqual(scoreTargets(revealed), ['*']);
+  assert.equal(data(revealed, 'lesson').lesson.sealed, undefined);
+  assert.equal(room.welcome('b', 5000).scores['1920'].blue, 10);
+});
+
+test('ending film follows eras held, with equal counts as a draw', () => {
+  const scores = eras => Object.fromEntries(Object.keys(wiringRecords).map(era => [era, eras[era] ?? { blue: 0, red: 0 }]));
+  assert.equal(endingFilm(scores({ 1920: { blue: 90, red: 0 } })), 'guardian');
+  assert.equal(endingFilm(scores({ 1920: { blue: 90, red: 0 }, 1930: { blue: 0, red: 10 }, 1940: { blue: 0, red: 10 } })), 'luddite');
+  assert.equal(endingFilm(scores({ 1920: { blue: 90, red: 0 }, 1930: { blue: 0, red: 10 } })), 'draw');
+  assert.equal(endingFilm(scores({})), 'draw');
+});
+
+test('starting a new game clears the seal and the pending ending', () => {
+  const room = lessonRoom();
+  room.command('t', { type: 'end' }, 3000);
+  room.command('t', { type: 'ending' }, 4000);
+  const out = room.command('t', { type: 'start', minutes: 5 }, 5000);
+  assert.equal(room.lesson.sealed, false);
+  assert.equal(data(out, 'ending', 't').ending, null);
+  assert.deepEqual(scoreTargets(out), ['*']);
+});
+
+test('a live raid shock stays off student sockets during the hidden last 30 seconds', () => {
+  const room = lessonRoom();
+  room.scores['1920'] = { blue: 50, red: 50 };
+  const [attacker, defender] = ['a', 'b'].map(id => room.sessions.get(id));
+  room.tick(room.lesson.endsAt - RULES.sealScoresMs);
+  const raid = { id: 'r', attacker: 'a', defender: 'b', endsAt: room.lesson.endsAt, shocks: 0, stolen: 0, cooldownUntil: 0, stunUntil: 0, invulnUntil: 0 };
+  room.raids.set('r', raid); attacker.raid = defender.raid = 'r';
+  attacker.player = { x: 100, y: 100, direction: 'up', moving: false }; defender.player = { x: 100, y: 110, direction: 'up', moving: false };
+  const out = room.command('a', { type: 'shock' }, room.lesson.endsAt - 20000);
+  assert.equal(raid.shocks, 1);
+  assert.deepEqual(scoreTargets(out), ['t']);
+});
+
+test('results name awards and the best moment, and give each student their own card', () => {
+  const room = lessonRoom();
+  room.tick(room.lesson.endsAt - RULES.sealScoresMs);
+  room.scores['1920'] = { blue: 0, red: 10 };
+  const flipAt = room.lesson.endsAt - 12000;
+  mission(room, 'a', '1920', flipAt);
+  mission(room, 'a', '1920', flipAt);
+  room.command('t', { type: 'end' }, flipAt + 1000);
+  assert.equal(room.teacherWelcome(flipAt + 1000).results, null);
+  room.command('t', { type: 'ending' }, flipAt + 2000);
+  const out = room.command('t', { type: 'reveal' }, flipAt + 3000);
+  const shared = data(out, 'results', 't').results;
+  assert.equal(shared.highlight.kind, 'flip');
+  assert.deepEqual(shared.highlight.flip, { name: 'A', era: '1920', seconds: 12 });
+  assert.match(shared.highlight.text, /종료 12초 전, A이\(가\) 1920년대를 뒤집었어요/);
+  const restorer = shared.awards.find(award => award.id === 'restorer');
+  assert.deepEqual([restorer.name, restorer.value], ['A', 2]);
+  assert.equal(JSON.stringify(shared).includes('"ta"'), false);
+  assert.deepEqual(data(out, 'results', 'a').mine.awards.map(award => award.id), ['restorer', 'clutch']);
+  assert.deepEqual(data(out, 'results', 'b').mine.awards, []);
+  assert.equal(room.welcome('a', flipAt + 4000).mine.missions, 2);
+  room.command('t', { type: 'reset' }, flipAt + 5000);
+  assert.equal(room.lesson.results, null);
+  assert.equal(room.lesson.highlight, null);
+  assert.equal(room.profiles.get('ta').stats.clutch, 0);
+});
+
+const raidOn = (room, at) => {
+  const [attacker, defender] = ['a', 'b'].map(id => room.sessions.get(id));
+  attacker.profile.team = 'blue'; defender.profile.team = 'red'; attacker.profile.raidRights = 1;
+  for (const id of ['c', 'd']) room.sessions.get(id).raid = 'busy';
+  room.command('a', { type: 'raid' }, at);
+  const raid = [...room.raids.values()][0];
+  attacker.player = { x: 288, y: 500, direction: 'up', moving: true };
+  defender.player = { x: 288, y: 520, direction: 'up', moving: true };
+  return raid;
+};
+
+test('the best raid becomes a clipped replay that only teachers receive', () => {
+  const room = lessonRoom();
+  room.scores['1920'] = { blue: 40, red: 40 };
+  const raid = raidOn(room, 2000);
+  room.command('b', { type: 'move', x: 288, y: 519, direction: 'up', moving: true }, 2200);
+  room.command('a', { type: 'shock' }, 12000);
+  room.tick(raid.endsAt);
+  assert.equal(room.lesson.replay.kind, 'shock');
+  assert.equal(room.lesson.replay.durationMs, 9000 );
+  assert.equal(room.lesson.replay.shocks[0].t, 7200);
+  assert.deepEqual(room.lesson.replay.attacker.player.x, 288);
+  room.command('t', { type: 'end' }, 20000);
+  const out = room.command('t', { type: 'reveal' }, 21000);
+  assert.equal(data(out, 'results', 't').results.replay.weight, undefined);
+  assert.equal(data(out, 'results', 't').results.replay.defender.name, 'B');
+  assert.equal(data(out, 'results', 'a').results.replay, undefined);
+  assert.equal(room.welcome('a', 22000).results.replay, undefined);
+  assert.equal(room.teacherWelcome(22000).results.replay.kind, 'shock');
+  room.command('t', { type: 'reset' }, 23000);
+  assert.equal(room.lesson.replay, null);
+});
+
+test('a clean escape can be replayed but a raid cut off by the teacher cannot', () => {
+  const room = lessonRoom();
+  const raid = raidOn(room, 2000);
+  room.tick(raid.endsAt);
+  assert.equal(room.lesson.replay.kind, 'escape');
+  const other = lessonRoom();
+  raidOn(other, 2000);
+  other.command('t', { type: 'pause' }, 3000);
+  assert.equal(other.lesson.replay, null);
+  assert.equal(other.raidTracks.size, 0);
+});
+
+test('the staged comeback route is walkable and ends beside every terminal', () => {
+  for (const terminal of map.terminals) {
+    const route = terminalRoute(terminal.era);
+    for (let leg = 1; leg < route.length; leg++) for (let step = 0; step <= 40; step++) {
+      const x = route[leg - 1].x + (route[leg].x - route[leg - 1].x) * step / 40, y = route[leg - 1].y + (route[leg].y - route[leg - 1].y) * step / 40;
+      assert.equal(validPosition(x, y), true, `${terminal.era} ${x},${y}`);
+    }
+    assert.equal(isNearTerminal(route.at(-1), terminal), true);
+  }
 });
