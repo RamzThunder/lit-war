@@ -5,9 +5,8 @@ import { bindContam } from './bindContam.js';
 import { bindHud } from './bindHud.js';
 import { bindNewMissions } from './bindNewMissions.js';
 import { MISSION_LABEL } from '../minigames/missionTypes.js';
-import { frequencyRecords } from '../minigames/frequency.js';
 import { bindWiringDrag } from './wiringDrag.js';
-import { wiringRecords, eraLabel } from '../minigames/wiring.js';
+import { roundRecords, eraLabel } from '../minigames/wiring.js';
 export function bindUI(state) {
   const $ = selector => document.querySelector(selector);
   const dialog = $('#terminal');
@@ -71,7 +70,7 @@ export function bindUI(state) {
     const missionRound = currentRound && currentRound.type !== 'repair' ? currentRound : null;
     const era = missionRound?.era ?? terminal;
     const open = terminalOpen && Boolean(terminal);
-    records = wiringRecords[era] ?? [];
+    records = roundRecords(missionRound);
     const round = missionRound?.type === 'wiring' ? missionRound : null;
     const frequency = missionRound?.type === 'frequency';
     if (era) {
@@ -82,7 +81,7 @@ export function bindUI(state) {
     }
     $('#wiring-panel').hidden = !round;
     $('#mission-type').textContent = missionRound ? `이번 미션 · ${MISSION_LABEL[missionRound.type]}` : '미션 로딩 중…';
-    const notes = { memory: '키워드 순서를 기억한 뒤 차례로 선택 · 완료 시 +10점', shooter: '해당 시대가 아닌 키워드 3개 격추 · 완료 시 +10점', identity: '작품을 선택하고 카드를 끝까지 밀기 · 3장 완료 시 +10점', filter: '작가와 작품을 시대별로 분류 · 6장 완료 시 +10점', chronology: '작품 3개를 발표 연도순으로 선택 · 완료 시 +10점', engine: '발표 연도를 다이얼로 맞추기 · 완료 시 +10점', upload: '빈 기록에 키워드 업로드 · 완료 시 +10점', truth: '작가와 작품 연결의 진위 판별 · 완료 시 +10점', mail: '작품을 맞는 시대 우편함에 배달 · 완료 시 +10점', cooking: '「동백꽃」 사건을 순서대로 조리 · 완료 시 +10점', fishing: '이 시대 키워드만 낚기 · 완료 시 +10점', puzzle: '작품명 조각을 순서대로 복원 · 완료 시 +10점', frequency: '슬라이더로 파형 조정 → 신호 복구 · 3단계 완료 시 +10점', wiring: '클릭 또는 드래그로 세 쌍 연결 · 완료 시 +10점' };
+    const notes = { memory: '키워드 순서를 기억한 뒤 차례로 선택 · 완료 시 +10점', shooter: '해당 시대가 아닌 키워드 3개 격추 · 완료 시 +10점', identity: '작품을 선택하고 카드를 끝까지 밀기 · 3장 완료 시 +10점', filter: '작가와 작품을 시대별로 분류 · 6장 완료 시 +10점', chronology: '작품 3개를 발표 연도순으로 선택 · 완료 시 +10점', engine: '발표 연도를 다이얼로 맞추기 · 완료 시 +10점', upload: '빈 기록에 키워드 업로드 · 완료 시 +10점', truth: '작가와 작품 연결의 진위 판별 · 완료 시 +10점', mail: '작품을 맞는 시대 우편함에 배달 · 완료 시 +10점', cooking: '작품의 사건을 일어난 순서대로 놓기 · 완료 시 +10점', fishing: '이 시대 키워드만 낚기 · 완료 시 +10점', puzzle: '작품명 조각을 순서대로 복원 · 완료 시 +10점', frequency: '슬라이더로 파형 조정 → 신호 복구 · 3단계 완료 시 +10점', wiring: '클릭 또는 드래그로 세 쌍 연결 · 완료 시 +10점' };
     $('#mission-note').textContent = `${notes[missionRound?.type] ?? ''} · ESC 중단`;
     if (frequency) $('#terminal-feedback').textContent = '';
     // Rebuild only for a new round; preserve focus and DOM on individual connections.
@@ -115,9 +114,9 @@ export function bindUI(state) {
     $('#restored-records').hidden = !complete;
     if (complete) {
       $('#terminal-feedback').textContent = state.me?.team === 'red' ? `원본 탈취 완료! 인간의 기록으로 빼돌렸다 · ${eraLabel(era)} +10점` : `${MISSION_LABEL[missionRound.type]} 완료 · ${eraLabel(era)} +10점`;
-      $('#restored-records').replaceChildren(...(frequency ? frequencyRecords[era] : records).map(r => {
+      $('#restored-records').replaceChildren(...(frequency ? missionRound.concepts : records).map(r => {
         const line = document.createElement('p');
-        line.textContent = frequency ? `${r.word} — ${r.description}` : `${r.author} — 「${r.title}」 (${r.year}${r.yearNote ? ` ${r.yearNote}` : ''}) · ${r.keyword}`;
+        line.textContent = frequency ? `${r.word} — ${r.description}` : `${r.author} — 「${r.title}」${r.year ? ` (${r.year})` : ''} · ${r.keyword}`;
         return line;
       }));
     }

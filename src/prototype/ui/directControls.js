@@ -1,5 +1,4 @@
-import { wiringRecords, recordById } from '../minigames/wiring.js';
-import { frequencyRecords } from '../minigames/frequency.js';
+import { recordById, roundRecords } from '../minigames/wiring.js';
 import { instrumentScene, showShelf } from './recordInstruments.js';
 
 function element(tag, name, text = '') {
@@ -46,7 +45,7 @@ function impact(target, text, kind) {
 
 export function fishingField(round, submit) {
   return movingField('aquarium', round.pond, round.caught, (word, target) => {
-    const correct = frequencyRecords[round.era].some(record => record.word === word);
+    const correct = round.concepts.some(record => record.word === word);
     impact(target, correct ? word : '놓아주기', correct ? 'reel-up' : 'miss');
     submit(word);
   });
@@ -54,7 +53,7 @@ export function fishingField(round, submit) {
 
 export function shooterBoard(round, shoot) {
   const board = element('div', 'tracking-console');
-  board.append(element('p', 'tracking-reference', '정상 신호 · ' + frequencyRecords[round.era].map(r => r.word).join(' / ')));
+  board.append(element('p', 'tracking-reference', '정상 신호 · ' + round.concepts.map(r => r.word).join(' / ')));
   board.append(movingField('tracking-radar', round.targets, round.hit, (word, target) => {
     const wrong = round.wrong.includes(word);
     impact(target, wrong ? '✳' : '정상 신호', wrong ? 'burst' : 'miss');
@@ -102,7 +101,7 @@ export function identityBoard(round, verify) {
     const result = verify(author.id, selected, true);
     if (result === 'incorrect' || selected !== author.id) hint.textContent = '신원이 일치하지 않아요. 작품을 다시 골라 주세요.';
   }
-  for (const record of wiringRecords[round.era]) {
+  for (const record of roundRecords(round)) {
     const key = control('identity-work', '「' + record.title + '」');
     key.setAttribute('aria-pressed', 'false');
     key.addEventListener('click', () => {

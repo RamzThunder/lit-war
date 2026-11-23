@@ -1,5 +1,5 @@
 import { showSignal } from './recordInstruments.js';
-import { frequencyRecords as byEra, isTuned, wavePath } from '../minigames/frequency.js';
+import { isTuned, wavePath } from '../minigames/frequency.js';
 import { eraLabel } from '../minigames/wiring.js';
 export function bindFrequency(state) {
   const $ = selector => document.querySelector(selector);
@@ -14,7 +14,7 @@ export function bindFrequency(state) {
     const active = round?.type === 'frequency';
     $('#frequency-panel').hidden = !active;
     if (!active) { previousStage = -1; return; }
-    const frequencyRecords = byEra[round.era];
+    const frequencyRecords = round.concepts;
     $('#frequency-label').textContent = `${round.era}s / SIGNAL RECOVERY`;
     const stage = Math.min(round.stage, frequencyRecords.length - 1);
     const tuned = isTuned(round);

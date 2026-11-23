@@ -2,9 +2,9 @@ import { bookBoard, identityBoard, shooterBoard } from './prototype/ui/directCon
 import { instrumentScene, showSequence, showSignal } from './prototype/ui/recordInstruments.js';
 import { GameState } from './prototype/state/GameState.js';
 import { createMissionRound, MISSION_LABEL } from './prototype/minigames/missionTypes.js';
-import { ERAS, wiringRecords, shuffledIds, recordById } from './prototype/minigames/wiring.js';
-import { frequencyRecords, createFrequencyRound, wavePath, TOLERANCE } from './prototype/minigames/frequency.js';
-import { EXTRA_TYPES, COOKING } from './prototype/minigames/extraMissions.js';
+import { ERAS, createWiringRound, eraLabel, recordById, roundRecords } from './prototype/minigames/wiring.js';
+import { createFrequencyRound, wavePath, TOLERANCE } from './prototype/minigames/frequency.js';
+import { EXTRA_TYPES } from './prototype/minigames/extraMissions.js';
 import { renderExtraMission, extraProgress } from './prototype/ui/renderExtraMission.js';
 
 const $ = selector => document.querySelector(selector);
@@ -20,7 +20,7 @@ const instructions = {
   upload: '작가와 작품에 맞는 키워드를 빈 기록에 업로드하세요.',
   truth: '작가와 작품의 연결이 참인지 거짓인지 판정하세요.',
   mail: '작품 카드를 해당 시대 우편함으로 배달하세요.',
-  cooking: '김유정 「동백꽃」의 사건 카드를 이야기 순서대로 조리하세요.',
+  cooking: '작품의 사건 카드를 일어난 순서대로 놓으세요.',
   fishing: '이 시대의 키워드만 낚아 데이터망으로 올리세요.',
   puzzle: '흩어진 작품명 조각을 순서대로 이어 붙이세요.',
   wiring: '작가를 누른 뒤 해당 작품을 누르면 배선이 연결됩니다.',
@@ -36,12 +36,11 @@ const record = id => recordById(id);
 const tryAction = (result, success = '복구 중…') => feedback(result === 'incorrect' ? '다시 확인해 보세요.' : result === 'complete' ? '완료!' : success);
 
 function createRound() {
-  if (type === 'wiring') return { type, era, order: shuffledIds(era), matched: [], complete: false };
+  if (type === 'wiring') return createWiringRound(era);
   if (type === 'frequency') return createFrequencyRound(era);
   return createMissionRound(era, type);
 }
 function start() {
-  if (type === 'cooking' && era !== COOKING.era) { era = COOKING.era; $('#era').value = era; }
   clearTimeout(memoryTimer); selected = null; feedback('');
   game = new GameState({ terminalOpen: true, terminal: era, round: createRound() });
   game.subscribe(render);
@@ -83,13 +82,13 @@ function render({ round }) {
     const r = record(round.order[round.stage]);
     content.append(instrumentScene('sort-chutes', node('div', 'card', `${r.author} · 「${r.title}」`)));
     const box = choices();
-    box.append(button(`${era}년대 기록`, () => tryAction(game.classify(r.id, 'current'))), button('다른 시대 기록', () => tryAction(game.classify(r.id, 'other'))));
+    box.append(button(`${eraLabel(era)} 기록`, () => tryAction(game.classify(r.id, 'current'))), button('다른 시대 기록', () => tryAction(game.classify(r.id, 'other'))));
   } else if (type === 'chronology') {
     content.append(bookBoard(round, id => tryAction(game.shelve(id), '책을 꽂았습니다.')));
   } else if (type === 'wiring') {
     const pair = node('div', 'pair'); const authors = node('div', 'choices'); const works = node('div', 'choices');
     authors.style.gridTemplateColumns = works.style.gridTemplateColumns = '1fr';
-    for (const r of wiringRecords[era]) {
+    for (const r of roundRecords(round)) {
       const b = button(r.author, () => { selected = r.id; authors.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
       b.disabled = round.matched.includes(r.id); authors.append(b);
     }
@@ -103,7 +102,7 @@ function render({ round }) {
     cables.setAttribute('preserveAspectRatio', 'none');
     cables.setAttribute('aria-hidden', 'true');
     for (const id of round.matched) {
-      const left = wiringRecords[era].findIndex(r => r.id === id) * 100 + 50;
+      const left = round.works.indexOf(id) * 100 + 50;
       const right = round.order.indexOf(id) * 100 + 50;
       const cable = document.createElementNS(cables.namespaceURI, 'path');
       cable.setAttribute('d', `M0 ${left} C55 ${left} 45 ${right} 100 ${right}`);
@@ -113,7 +112,7 @@ function render({ round }) {
     pair.append(authors, cables, works); content.append(pair);
   } else {
     const stage = round.stage;
-    content.append(node('p', 'label', `신호 복구 ${stage + 1} / 3 · ${frequencyRecords[era][stage].word}`));
+    content.append(node('p', 'label', `신호 복구 ${stage + 1} / 3 · ${round.concepts[stage].word}`));
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 360 120'); svg.classList.add('wave');
     const target = document.createElementNS('http://www.w3.org/2000/svg', 'path'); target.classList.add('target'); target.setAttribute('d', wavePath(round.targets[stage]));
     const live = document.createElementNS('http://www.w3.org/2000/svg', 'path'); live.classList.add('live'); live.setAttribute('d', wavePath(round.value)); svg.append(target, live);
@@ -127,7 +126,7 @@ function render({ round }) {
     content.append(instrumentScene('receiver', svg), meter, output, slider, lock);
   }
 }
-for (const value of ERAS) { const option = node('option', '', `${value}년대`); option.value = value; $('#era').append(option); }
+for (const value of ERAS) { const option = node('option', '', eraLabel(value)); option.value = value; $('#era').append(option); }
 $('#era').value = era;
 $('#era').addEventListener('change', event => { era = event.target.value; start(); });
 for (const value of types) { const b = button(MISSION_LABEL[value], () => { type = value; start(); }); b.dataset.type = value; $('#mission-list').append(b); }

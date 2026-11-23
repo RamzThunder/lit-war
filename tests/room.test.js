@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomEngine, RULES, endingFilm } from '../server/RoomEngine.js';
 import { map, terminalFor, terminalRoute, doorFor, validPosition, isNearTerminal } from '../src/prototype/map.js';
-import { wiringRecords } from '../src/prototype/minigames/wiring.js';
+import { wiringRecords, recordById } from '../src/prototype/minigames/wiring.js';
 import { repairAnswer } from '../src/prototype/minigames/repair.js';
 import { createMissionRound } from '../src/prototype/minigames/missionTypes.js';
 import { GameState } from '../src/prototype/state/GameState.js';
@@ -14,7 +14,7 @@ const data = (out, type, to) => out.find(o => o.data.type === type && (to === un
 function mission(room, id, era = '1920', now = 1000) {
   room.command(id, { type: 'open', era, ...near(era) }, now);
   let out = [];
-  for (const r of wiringRecords[era]) out = room.command(id, { type: 'connect', author: r.id, work: r.id }, now);
+  for (const work of room.sessions.get(id).game.snapshot.round.works) out = room.command(id, { type: 'connect', author: work, work }, now);
   room.command(id, { type: 'close' }, now);
   return out;
 }
@@ -66,7 +66,7 @@ test('server judges filter and chronology without accepting a direct score comma
       for (const id of round.order) room.command('a', { type: 'classify', id, era: wiringRecords['1930'].some(r => r.id === id) ? 'current' : 'other' });
     } else {
       const order = [...round.order].sort((a, b) => {
-        const left = wiringRecords['1930'].find(r => r.id === a), right = wiringRecords['1930'].find(r => r.id === b);
+        const left = recordById(a), right = recordById(b);
         return left.year - right.year || left.title.localeCompare(right.title, 'ko');
       });
       for (const id of order) room.command('a', { type: 'shelve', id });
@@ -82,9 +82,9 @@ test('server judges every additional mission before awarding points', () => {
   for (const type of ['engine', 'upload', 'truth', 'mail', 'cooking', 'fishing', 'puzzle']) {
     player.game = new GameState({ terminalOpen: true, terminal: '1930', round: createExtraRound('1930', type, () => .3) });
     let round = player.game.snapshot.round;
-    const total = type === 'truth' ? round.claims.length : type === 'mail' ? round.order.length : type === 'cooking' ? COOKING.steps.length : type === 'puzzle' ? round.pieces.length : 3;
+    const total = type === 'truth' ? round.claims.length : type === 'mail' ? round.order.length : type === 'cooking' ? COOKING['1930'].steps.length : type === 'puzzle' ? round.pieces.length : 3;
     for (let i = 0; i < total; i++) {
-      const value = type === 'fishing' ? frequencyRecords['1930'][i].word : extraTarget(round);
+      const value = type === 'fishing' ? round.concepts[i].word : extraTarget(round);
       const out = room.command('a', { type: 'extra', value });
       round = data(out, 'state').state.round;
       assert.equal(data(out, 'state').result, i === total - 1 ? 'complete' : 'correct');

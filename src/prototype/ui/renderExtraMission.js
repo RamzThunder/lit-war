@@ -2,7 +2,7 @@ import { fishingField } from './directControls.js';
 import { motorDrive } from './motorDrive.js';
 import { instrumentScene } from './recordInstruments.js';
 import { ERAS, eraLabel, recordById } from '../minigames/wiring.js';
-import { COOKING, uploadOptions } from '../minigames/extraMissions.js';
+import { COOKING, decadeOf, uploadOptions } from '../minigames/extraMissions.js';
 
 const el = (tag, text = '', className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
 const button = (text, action) => { const node = el('button', text); node.type = 'button'; node.addEventListener('click', action); return node; };
@@ -11,7 +11,7 @@ const grid = root => { const box = el('div', '', 'mission-choices'); root.append
 export function extraProgress(round) {
   if (round.type === 'truth') return [round.stage, round.claims.length];
   if (round.type === 'fishing') return [round.caught.length, 3];
-  if (round.type === 'cooking') return [round.picked.length, COOKING.steps.length];
+  if (round.type === 'cooking') return [round.picked.length, COOKING[round.era].steps.length];
   if (round.type === 'puzzle') return [round.picked.length, round.pieces.length];
   return [round.stage, round.order.length];
 }
@@ -105,13 +105,14 @@ export function renderExtraMission(root, round, submit) {
     const instrument = el('div', '', 'bench-instrument');
     const face = el('div', '', 'bench-dial');
     face.setAttribute('aria-hidden', 'true');
-    const output = el('output', round.era + '년');
+    const decade = decadeOf(work.year);
+    const output = el('output', decade + '년');
     const slider = el('input');
-    Object.assign(slider, { type: 'range', min: round.era, max: Number(round.era) + 9, value: round.era });
+    Object.assign(slider, { type: 'range', min: decade, max: decade + 9, value: decade });
     slider.setAttribute('aria-label', '작품의 ' + (work.yearNote ?? '발표') + ' 연도');
     const read = () => {
-      turn(Number(slider.value) - Number(round.era));
-      face.style.setProperty('--angle', (-108 + (slider.value - Number(round.era)) * 24) + 'deg');
+      turn(Number(slider.value) - decade);
+      face.style.setProperty('--angle', (-108 + (slider.value - decade) * 24) + 'deg');
       output.textContent = slider.value + '년';
       slider.setAttribute('aria-valuetext', output.textContent);
     };
@@ -137,15 +138,16 @@ export function renderExtraMission(root, round, submit) {
     boxes.setAttribute('aria-label', '시대별 우편함');
     for (const era of ERAS) boxes.append(button(eraLabel(era), () => send(era)));
   } else if (round.type === 'cooking') {
-    board.append(el('p', '사건을 이야기 순서대로 조리대에 올리세요.'));
+    const story = COOKING[round.era];
+    board.append(el('p', `${story.author}, 「${story.title}」의 사건을 일어난 순서대로 올리세요.`));
     const tray = el('ol', '', 'bench-recipe');
-    for (let i = 0; i < COOKING.steps.length; i++) {
-      tray.append(el('li', COOKING.steps[round.picked[i]] ?? '재료 대기', i < round.picked.length ? 'filled' : ''));
+    for (let i = 0; i < story.steps.length; i++) {
+      tray.append(el('li', story.steps[round.picked[i]] ?? '사건 대기', i < round.picked.length ? 'filled' : ''));
     }
     board.append(instrumentScene('kitchen', tray));
     const box = grid(board);
     for (const index of round.order) {
-      const key = button(COOKING.steps[index], () => send(index));
+      const key = button(story.steps[index], () => send(index));
       key.disabled = round.picked.includes(index);
       box.append(key);
     }

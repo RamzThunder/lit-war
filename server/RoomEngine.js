@@ -1,6 +1,6 @@
 import { GameState, MISSION_POINTS } from '../src/prototype/state/GameState.js';
 import { map, ERAS, validPosition, terminalFor, doorFor, isNearTerminal, isNearDoor } from '../src/prototype/map.js';
-import { wiringRecords, shuffle } from '../src/prototype/minigames/wiring.js';
+import { wiringRecords, samePeriod, shuffle } from '../src/prototype/minigames/wiring.js';
 import { eraOwner, heldCount } from '../src/shared/eras.js';
 import { buildResults, newStats, personalResult } from './results.js';
 import { clipTrack, newTrack, recordMove, recordShock } from './replay.js';
@@ -305,8 +305,8 @@ export class RoomEngine {
     const record = shuffle(wiringRecords[era], this.random)[0];
     const field = this.random() < .5 ? 'era' : 'author';
     const others = field === 'era'
-      ? shuffle(ERAS.filter(e => e !== era), this.random).slice(0, 3)
-      : shuffle(ERAS.filter(e => e !== era).flatMap(e => wiringRecords[e].map(r => r.author)), this.random).slice(0, 3);
+      ? shuffle(ERAS.filter(e => !samePeriod(e, era)), this.random).slice(0, 3)
+      : shuffle([...new Set(ERAS.filter(e => e !== era).flatMap(e => wiringRecords[e].map(r => r.author)))].filter(a => a !== record.author), this.random).slice(0, 3);
     const truth = field === 'era' ? era : record.author;
     s.bait = { era, recordId: record.id, field, truth, options: shuffle([truth, ...others], this.random) };
     const card = field === 'era' ? { title: record.title, author: record.author } : { title: record.title, era };
@@ -330,8 +330,8 @@ export class RoomEngine {
     const fake = { ...truth, [bait.field]: message.value };
     const terminalEra = bait.field === 'era' ? message.value : bait.era;
     const others = bait.field === 'era'
-      ? shuffle(ERAS.filter(e => e !== bait.era && e !== message.value), this.random).slice(0, 2)
-      : shuffle(ERAS.flatMap(e => wiringRecords[e].map(r => r.author)).filter(a => a !== record.author && a !== message.value), this.random).slice(0, 2);
+      ? shuffle(ERAS.filter(e => !samePeriod(e, bait.era) && e !== message.value), this.random).slice(0, 2)
+      : shuffle([...new Set(ERAS.flatMap(e => wiringRecords[e].map(r => r.author)))].filter(a => a !== record.author && a !== message.value), this.random).slice(0, 2);
     const id = `${now}-${s.id}`;
     const contam = { kind: 'contam', era: terminalEra, by: s.name, until: null, id, field: bait.field, card: fake, trueEra: bait.era, truth: bait.truth, options: shuffle([bait.truth, message.value, ...others], this.random) };
     const live = this.#liveSession(token);

@@ -1,10 +1,9 @@
 // Real WebSocket integration against the local Wrangler runtime (no browser required).
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
-import { wiringRecords } from '../src/prototype/minigames/wiring.js';
+import { wiringRecords, recordById } from '../src/prototype/minigames/wiring.js';
 import { repairAnswer } from '../src/prototype/minigames/repair.js';
 import { EXTRA_TYPES, extraTarget, COOKING } from '../src/prototype/minigames/extraMissions.js';
-import { frequencyRecords } from '../src/prototype/minigames/frequency.js';
 import { map, terminalFor, doorFor, validPosition, isNearTerminal } from '../src/prototype/map.js';
 const base = process.env.TEST_WS_URL ?? 'ws://127.0.0.1:8787';
 const room = `T${Date.now().toString(36).toUpperCase()}`;
@@ -44,19 +43,19 @@ async function mission(client, era) {
     for (const id of round.order) { client.send({ type: 'classify', id, era: wiringRecords[era].some(r => r.id === id) ? 'current' : 'other' }); round = (await client.wait('state')).state.round; }
   } else if (round.type === 'chronology') {
     const order = [...round.order].sort((a, b) => {
-      const left = wiringRecords[era].find(r => r.id === a), right = wiringRecords[era].find(r => r.id === b);
+      const left = recordById(a), right = recordById(b);
       return left.year - right.year || left.title.localeCompare(right.title, 'ko');
     });
     for (const id of order) { client.send({ type: 'shelve', id }); round = (await client.wait('state')).state.round; }
   } else if (EXTRA_TYPES.includes(round.type)) {
-    const total = round.type === 'mail' ? round.order.length : round.type === 'truth' ? round.claims.length : round.type === 'cooking' ? COOKING.steps.length : round.type === 'puzzle' ? round.pieces.length : 3;
+    const total = round.type === 'mail' ? round.order.length : round.type === 'truth' ? round.claims.length : round.type === 'cooking' ? COOKING[era].steps.length : round.type === 'puzzle' ? round.pieces.length : 3;
     for (let step = 0; step < total; step++) {
-      const value = round.type === 'fishing' ? frequencyRecords[era][step].word : extraTarget(round);
+      const value = round.type === 'fishing' ? round.concepts[step].word : extraTarget(round);
       client.send({ type: 'extra', value }); round = (await client.wait('state')).state.round;
     }
   } else if (round.type === 'frequency') {
     for (const target of round.targets) { client.send({ type: 'lock', value: target }); round = (await client.wait('state')).state.round; }
-  } else for (const r of wiringRecords[era]) { client.send({ type: 'connect', author: r.id, work: r.id }); round = (await client.wait('state')).state.round; }
+  } else for (const id of round.works) { client.send({ type: 'connect', author: id, work: id }); round = (await client.wait('state')).state.round; }
   assert.equal(round.complete, true);
   client.send({ type: 'close' }); await client.wait('state', m => !m.state.terminalOpen);
 }

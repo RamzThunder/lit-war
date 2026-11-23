@@ -1,8 +1,8 @@
-import { createFrequencyRound, isTuned, frequencyRecords } from '../minigames/frequency.js';
-import { ERAS, wiringRecords, shuffledIds } from '../minigames/wiring.js';
+import { createFrequencyRound, isTuned } from '../minigames/frequency.js';
+import { ERAS, createWiringRound, recordById, roundRecords, samePeriod, wiringRecords } from '../minigames/wiring.js';
 import { createRepairRound, nextRepairId } from '../minigames/repair.js';
 import { createMissionRound, MISSION_POOL } from '../minigames/missionTypes.js';
-import { EXTRA_TYPES, extraTarget, COOKING } from '../minigames/extraMissions.js';
+import { EXTRA_TYPES, extraTarget, COOKING, decadeOf } from '../minigames/extraMissions.js';
 export const MISSION_POINTS = 10;
 const emptyProgress = () => Object.fromEntries(ERAS.map(era => [era, 0]));
 // One student's room: mission rounds, personal progress and the sabotages placed in it.
@@ -29,9 +29,9 @@ export class GameState {
   addSabotage(sabotage) { this.#publish({ sabotages: [...this.#state.sabotages, sabotage] }); }
   removeSabotage(predicate) { this.#publish({ sabotages: this.#state.sabotages.filter(s => !predicate(s)) }); }
   #newRound(era, type = null, now = Date.now()) {
-    if (!type) { const pool = era === COOKING.era ? MISSION_POOL : MISSION_POOL.filter(item => item !== 'cooking'); type = pool[Math.floor(this.random() * pool.length)]; }
+    if (!type) type = MISSION_POOL[Math.floor(this.random() * MISSION_POOL.length)];
     if (type === 'frequency') return createFrequencyRound(era, this.random);
-    if (type === 'wiring') return { type: 'wiring', era, order: shuffledIds(era, this.random), matched: [], complete: false };
+    if (type === 'wiring') return createWiringRound(era, this.random);
     return createMissionRound(era, type, this.random, now);
   }
   #complete(round) {
@@ -69,14 +69,14 @@ export class GameState {
     if (!terminalOpen || round?.type !== 'frequency' || round.complete) return 'ignored';
     if (!isTuned(round)) return 'incorrect';
     const stage = round.stage + 1;
-    const complete = stage === frequencyRecords[round.era].length;
+    const complete = stage === round.concepts.length;
     const next = { ...round, stage, complete, value: complete ? round.value : 0 };
     if (complete) this.#complete(next); else this.#publish({ round: next });
     return complete ? 'complete' : 'correct';
   }
   connect(authorId, workId) {
     const { round, terminalOpen } = this.#state;
-    const records = wiringRecords[round?.era] ?? [];
+    const records = roundRecords(round);
     if (!terminalOpen || round?.type !== 'wiring' || round.complete || !records.some(r => r.id === authorId) || round.matched.includes(authorId)) return 'ignored';
     if (authorId !== workId) return 'incorrect';
     const matched = [...round.matched, authorId];
@@ -112,7 +112,7 @@ export class GameState {
   classify(id, era) {
     const round = this.#state.round;
     if (!this.#state.terminalOpen || round?.type !== 'filter' || round.complete || id !== round.order[round.stage] || !['current', 'other'].includes(era)) return 'ignored';
-    const isCurrent = wiringRecords[round.era].some(record => record.id === id);
+    const isCurrent = wiringRecords[round.era].some(record => record.id === id) || samePeriod(recordById(id).era, round.era);
     if (era !== (isCurrent ? 'current' : 'other')) return 'incorrect';
     const stage = round.stage + 1, next = { ...round, stage, complete: stage === round.order.length };
     if (next.complete) this.#complete(next); else this.#publish({ round: next });
@@ -123,8 +123,8 @@ export class GameState {
     if (!this.#state.terminalOpen || round?.type !== 'chronology' || round.complete || !round.order.includes(id) || round.picked.includes(id)) return 'ignored';
     const remaining = round.order.filter(item => !round.picked.includes(item));
     const expected = [...remaining].sort((a, b) => {
-      const left = wiringRecords[round.era].find(r => r.id === a);
-      const right = wiringRecords[round.era].find(r => r.id === b);
+      const left = recordById(a);
+      const right = recordById(b);
       return left.year - right.year || left.title.localeCompare(right.title, 'ko');
     })[0];
     if (id !== expected) { this.#publish({ round: { ...round, picked: [] } }); return 'incorrect'; }
@@ -139,7 +139,7 @@ export class GameState {
     let correct = false, next;
     if (round.type === 'fishing') {
       if (typeof value !== 'string' || !round.pond.includes(value) || round.caught.includes(value)) return 'ignored';
-      correct = frequencyRecords[round.era].some(r => r.word === value);
+      correct = round.concepts.some(r => r.word === value);
       if (correct) next = { ...round, caught: [...round.caught, value] };
     } else if (round.type === 'cooking' || round.type === 'puzzle') {
       if (!Number.isInteger(value)) return 'ignored';
@@ -148,15 +148,15 @@ export class GameState {
       correct = value === expected;
       next = { ...round, picked: correct ? [...round.picked, value] : [] };
     } else {
-      if (round.type === 'engine' && (!Number.isInteger(value) || value < Number(round.era) || value > Number(round.era) + 9)) return 'ignored';
+      if (round.type === 'engine' && (!Number.isInteger(value) || decadeOf(value) !== decadeOf(expected))) return 'ignored';
       if (round.type === 'upload' && typeof value !== 'string') return 'ignored';
       if (round.type === 'truth' && typeof value !== 'boolean') return 'ignored';
       if (round.type === 'mail' && !ERAS.includes(value)) return 'ignored';
-      correct = value === expected;
+      correct = round.type === 'mail' ? samePeriod(value, expected) : value === expected;
       next = { ...round, stage: round.stage + (correct ? 1 : 0) };
     }
     if (!correct) { if (next && next !== round) this.#publish({ round: next }); return 'incorrect'; }
-    const total = round.type === 'truth' ? round.claims.length : round.type === 'fishing' ? frequencyRecords[round.era].length : round.type === 'cooking' ? COOKING.steps.length : round.type === 'puzzle' ? round.pieces.length : round.order.length;
+    const total = round.type === 'truth' ? round.claims.length : round.type === 'fishing' ? round.concepts.length : round.type === 'cooking' ? COOKING[round.era].steps.length : round.type === 'puzzle' ? round.pieces.length : round.order.length;
     const progress = round.type === 'fishing' ? next.caught.length : ['cooking', 'puzzle'].includes(round.type) ? next.picked.length : next.stage;
     next.complete = progress === total;
     if (next.complete) this.#complete(next); else this.#publish({ round: next });
