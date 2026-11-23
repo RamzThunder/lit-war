@@ -68,12 +68,13 @@ def compose():
         note(ch,216,key,3.2,91)
     return sorted(events)
 
-THEME_FILE = "Luddite main Theme - Square Wave Assault.mp3"
+THEME_FILE = "luddite-main-square-wave-assault.mp3"
 THEME_START = 0.300
 
 def render(directory, master):
-    theme = directory.parent / THEME_FILE
-    human = directory.parent / 'Human main theme - Future Loop.mp3'
+    music = directory.parents[2] / 'assets/music/themes'
+    theme = music / THEME_FILE
+    human = music / 'human-main-future-loop.mp3'
     target = directory / (directory.name + '-sound.mp4')
     transition = ';'.join([
         '[2:a]atrim=duration=7,asetpts=PTS-STARTPTS,afade=t=out:st=4:d=1.3[human]',

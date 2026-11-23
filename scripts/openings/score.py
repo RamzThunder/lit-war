@@ -8,7 +8,8 @@ from ad_effects import write_effects
 from luddite_band import render as render_luddite
 
 ROOT = Path(__file__).resolve().parents[2] / 'output/openings'
-HUMAN = 'Human main theme - Future Loop.mp3'
+MUSIC = ROOT.parents[1] / 'assets/music/themes'
+HUMAN = 'human-main-future-loop.mp3'
 
 
 def render(folder, master, filters, extra_tracks=(), ad_effects=False):
@@ -16,7 +17,7 @@ def render(folder, master, filters, extra_tracks=(), ad_effects=False):
     target = directory / (folder + '-sound.mp4')
     with tempfile.TemporaryDirectory(dir=directory) as tmp:
         staged = Path(tmp) / target.name
-        tracks = [ROOT / track for track in extra_tracks]
+        tracks = [MUSIC / track for track in extra_tracks]
         if ad_effects:
             effects = Path(tmp) / 'card-effects.wav'
             write_effects(effects)
@@ -25,7 +26,7 @@ def render(folder, master, filters, extra_tracks=(), ad_effects=False):
             tracks.extend((effects, ROOT.parents[1] / 'assets/audio/human-ad-cheer.mp3', speech))
         subprocess.run([
             'ffmpeg', '-v', 'error', '-i', str(directory / master),
-            '-i', str(ROOT / HUMAN),
+            '-i', str(MUSIC / HUMAN),
             *(arg for track in tracks for arg in ('-i', str(track))),
             '-filter_complex', ';'.join(filters), '-map', '0:v:0', '-map', '[out]',
             '-c:v', 'copy', '-c:a', 'aac', '-ar', '48000', '-ac', '2',
@@ -49,7 +50,7 @@ def render_common():
         'loudnorm=I=-22:TP=-5:LRA=7,aresample=48000,volume=2dB,afade=t=in:d=0.05,'
         'afade=t=out:st=1.45:d=1.15,adelay=54900:all=1[cheer]',
         '[ad][room][click][fx][cheer][5:a]amix=inputs=6:normalize=0,alimiter=limit=0.91:level=0:latency=1,aresample=48000,apad=whole_len=6096000,atrim=end_sample=6096000,asetpts=N/SR/TB[out]',
-    ], extra_tracks=['Real Human theme - No Loop.m4a'], ad_effects=True)
+    ], extra_tracks=['real-human-no-loop.m4a'], ad_effects=True)
 
 
 if __name__ == '__main__':
