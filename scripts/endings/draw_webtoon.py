@@ -10,7 +10,7 @@ from storyboard import SOURCE as BOARD, read_board
 ROOT = Path(__file__).resolve().parents[2]
 CUTS = ROOT / 'assets/endings/cuts/draw'
 SOURCE = ROOT / 'output/endings/draw-rough-alarm.mp4'
-TARGET = ROOT / 'output/endings/draw-webtoon-v2.mp4'
+TARGET = ROOT / 'output/endings/draw-webtoon-v3.mp4'
 FONT = Path(os.environ.get('MONA_FONT', ROOT.parent / 'censor-escape/fonts/Mona10x12.woff2'))
 CREST = ROOT / 'assets/concept/logos/human-logo-white-glow.png'
 FPS = 24
@@ -100,18 +100,17 @@ def main():
             run(titles, path, style, title, caption, FONT, CREST, 'draw')
             return path
 
-        def clip_frame(name, clip, at):
-            path = tmp / f'{name}.png'
-            ff('-ss', at, '-i', CUTS / clip, '-frames:v', 1, '-vf', 'scale=1664:-1:flags=lanczos', path)
-            return path
-
-        guardian_points = clip_frame('guardian-points', '04-02.mp4', 2.5)
-        both_still = clip_frame('both-still', '04-02.mp4', 3.8)
-        luddite_points = clip_frame('luddite-points', '04-02.mp4', 4.9)
+        guardian_points = CUTS / '04-02-hq-guardian-points.png'
+        both_still = CUTS / '04-02-hq-both-still.png'
+        luddite_points = CUTS / '04-02-hq-luddite-points.png'
         record = scenes[2][1].split('|')
         bridge = read_bridge()
-        seated = CUTS / '04-03-c-left-seated.png'
+        paper = CUTS / '04-03-d-guardian-paper-v2.png'
+        writing = CUTS / '04-03-d-guardian-writing-v2.png'
+        sits = CUTS / '04-03-d-luddite-sits-v3.png'
+        both_writing = CUTS / '05-v2.png'
         guardian_seated, luddite_upper = (0, .2, .55), (.55, .02, .45)
+        guardian_writing = (0, .32, .55)
         clock = {'at': 26.0}
 
         def beat(key):
@@ -152,20 +151,20 @@ def main():
         seconds, caption = beat('연결04')
         add(dissolve, CUTS / '04-03-a.png', CUTS / '04-03-b.png', seconds, 1.6, caption)
         cut('연결05', CUTS / '04-03-c-empty.png', zoom=(1, 1))
-        cut('연결06', seated, guardian_seated, (1, 1.02))
-        cut('연결07', seated, guardian_seated, (1.02, 1.05))
-        cut('연결08', seated, luddite_upper, (1, 1.03))
-        cut('연결09', seated, guardian_seated, (1.05, 1.07))
-        cut('연결10', seated, luddite_upper, (1.03, 1.05))
-        cut('연결11', CUTS / '04-03-c-v2.png', zoom=(1, 1))
+        cut('연결06', paper, guardian_seated, (1, 1.02))
+        cut('연결07', writing, guardian_writing, (1.02, 1.05))
+        cut('연결08', writing, luddite_upper, (1, 1.03))
+        cut('연결09', writing, guardian_writing, (1.05, 1.07))
+        cut('연결10', writing, luddite_upper, (1.03, 1.05))
+        cut('연결11', sits, zoom=(1, 1))
 
-        add(still, CUTS / '05.png', 1.7, (0, .39, .6), (1, 1.02), layer('bench-1', 4, '', bench[0]))
-        add(still, CUTS / '05.png', 1.9, (.4, .39, .6), (1, 1.02), layer('bench-2', 4, '', bench[1]))
-        add(still, CUTS / '05.png', 1.2, (0, .39, .6), (1.03, 1.05), layer('bench-3', 4, '', bench[2]))
-        add(still, CUTS / '05.png', 1.65, (.4, .39, .6), (1.03, 1.05), layer('bench-4', 4, '', bench[3]))
+        add(still, both_writing, 1.7, (0, .35, .6), (1, 1.02), layer('bench-1', 4, '', bench[0]))
+        add(still, both_writing, 1.9, (.4, .35, .6), (1, 1.02), layer('bench-2', 4, '', bench[1]))
+        add(still, both_writing, 1.2, (0, .35, .6), (1.03, 1.05), layer('bench-3', 4, '', bench[2]))
+        add(still, both_writing, 1.65, (.4, .35, .6), (1.03, 1.05), layer('bench-4', 4, '', bench[3]))
         add(reuse, 39.5, 3.5)  # Only the pen tips move.
 
-        add(still, CUTS / '06.png', 6, zoom=(1.05, 1), layer=layer('leave', 5, scenes[6][0], scenes[6][1]))
+        add(still, CUTS / '06-v2.png', 6, zoom=(1.05, 1), layer=layer('leave', 5, scenes[6][0], scenes[6][1]))
         add(reuse, 49, 7)
 
         playlist = tmp / 'shots.txt'
